@@ -1,0 +1,358 @@
+\documentclass{article}
+
+%\usepackage{arxiv}
+% \usepackage{neurips_2019}
+\usepackage[preprint]{neurips_2019}
+%\usepackage[final]{neurips_2019}
+
+\input{preamble}
+
+\title{Semi-Modular Inference \\ Supplementary material}
+
+% \author{
+% Author 1 \\
+% Department 1\\
+% City 1\\
+% email 1\\
+% \And
+% Author 2 \\
+% Department 2\\
+% City 2\\
+% email 2\\
+% }
+
+\author{
+Chris U. Carmona \\
+Department of Statistics\\
+University of Oxford\\
+Oxford, U \\
+\texttt{carmona@stats.ox.ac.uk}\\
+\And
+Geoff K. Nicholls \\
+Department of Statistics\\
+University of Oxford\\
+Oxford, UK \\
+\texttt{nicholls@stats.ox.ac.uk}\\
+}
+
+
+<<init_chunk, eval=TRUE, echo=FALSE>>=
+rm(list = ls())
+options(scipen=999, stringsAsFactors=FALSE)
+set.seed(0)
+
+# Indicates if the MCMC will be computed (TRUE), or loaded from previously computed results (FALSE)
+compute_mcmc = FALSE
+
+# loading required packages #
+req.pck <- c( "aistats2020smi",
+              "tidyverse", "ggplot2",
+              "foreach","doParallel" )
+req.pck <- sapply(X=req.pck,FUN=require,character.only=T)
+if(!all(req.pck)) {
+  sapply(X=req.pck[!req.pck],FUN=install.packages,character.only=T);
+  sapply(X=req.pck,FUN=require,character.only=T)
+}
+
+# Setting nice ggplot theme settings
+aistats2020smi::set_ggtheme()
+@
+
+\begin{document}
+\maketitle
+
+In this document we present additional material which complements the main article. The numbers of sections in this document is aligned with the sections in the main article, for the ease of referencing (this does not apply for subsections and lower levels).
+
+
+\textbf{Notation: } For the sake of compactness in our derivations, the following expressions are used:
+\begin{align*}
+p(Z) &= \int \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi\\
+p(Z,Y)_{\theta} &= \int \int p(Z \mid \varphi) \; p( Y \mid \varphi, \theta ) \; p(\varphi,\theta) \; d\varphi \; d\theta\\
+p(Z,Y_{\eta})_{\tilde\theta} &= \int \int p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta\\
+p(Y_{\eta})_{\tilde\theta} &= \int \int p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta\\
+p(Y,\varphi)_{\theta} &= \int  p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) \;  d\theta \\
+p(Y  \mid  \varphi)_{\theta} &= \frac{1}{p(\varphi)} \; p(Y , \varphi)_{\theta}\\
+\end{align*}
+
+\setcounter{section}{1}
+
+\section{Background methods}\label{sec:background}
+
+% Geoff comments on misspecification
+What is model misspecification? Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. This is defined in more detail in Section~\ref{sec:opt_eta}. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
+
+\subsection{Explicit formulae for cut posterior}
+
+Recall the graphical analysed in the main text
+\begin{figure}[!ht]
+\begin{center}
+\begin{tikzpicture}
+    \node (Z) [data] {$Z$};
+    \node (Y) [data, right=of Z] {$Y$};
+    \node (phi) [param, below=of Z] {$\varphi$};
+    \node (theta) [param, below=of Y] {$\theta$};
+
+    \draw[dashed,red,line width=0.5mm] (1,0) -- (1,-2);
+
+    \edge {phi} {Z,Y};
+    \edge {theta} {Y};
+
+    \node[text width=3cm] at (0,1.2) {Module 1};
+    \node[text width=3cm] at (3.5,1.2) {Module 2};
+\end{tikzpicture}
+\end{center}
+\caption{Graphical representation of a simple multi-modular model.}
+\label{fig:toy_multimodular_model}
+\end{figure}
+
+The \textbf{conventional (full) posterior} for this model is:
+\begin{align} \label{eq:full_post}
+ p(\varphi,\theta \mid Z,Y) &= p(\varphi \mid Z, Y) \; p(\theta \mid Y,\varphi) \nonumber \\
+ &= p(Z,Y,\varphi,\theta ) \; \frac{ 1 }{ p(Z,Y)_{\theta} } \nonumber \\
+ &= p(Z \mid \varphi) \; p(Y \mid \varphi, \theta ) \; p(\varphi, \theta) \; \frac{ 1 }{ p(Z,Y)_{\theta} }
+\end{align}
+
+
+
+The \textbf{cut posterior} for this model is defined \citep{Plummer2015} as:
+\begin{align} \label{eq:cut_post}
+ p_{cut}(\varphi,\theta \mid Z,Y) &= p(\varphi \mid Z) \; p(\theta \mid Y,\varphi) \nonumber \\
+ &= \frac{ p(Z \mid \varphi) p(\varphi) }{ p(Z) } \frac{ p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) }{ p( Y,\varphi)_{\theta}} \nonumber \\
+ &= p(Z \mid \varphi) \; p(Y \mid \varphi, \theta ) \; \frac{ 1 }{ p(Z)} \; \frac{ 1 }{p(Y \mid \varphi)_{\theta} }  p(\varphi, \theta)
+\end{align}
+
+Note the relation between the cut posterior and the conventional posterior
+\begin{align*}
+ p_{cut}(\varphi,\theta \mid Z,Y) &= p(Z, Y , \varphi, \theta ) \; \frac{ 1 }{ p(Z) \; p(Y \mid \varphi)_{\theta} } \\
+ &= p(\varphi, \theta \mid Z, Y ) \; \frac{ p(Z, Y) }{ p(Z) \; p(Y \mid \varphi)_{\theta} } \\
+\end{align*}
+
+\section{Semi-Modular Inference} \label{sec:smi}
+
+\subsection{Explicit formulae for SMI posterior}
+
+
+The \textbf{$\eta$-smi posterior} is defined as
+\begin{align} \label{eq:smi_post}
+ p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) \; p(\theta \mid Y,\varphi) \nonumber \\
+ &= \frac{ p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) }{ p(Z, Y)_{\tilde\theta}} \frac{ p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) }{ p( Y , \varphi)_{\theta} } \nonumber \\
+ &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ &\propto p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \nonumber
+\end{align}
+
+In the penultimate step, we assume that $\theta$ and $\tilde\theta$ are conditionally independent given $\varphi$ in the prior, so $ p(\varphi, \theta, \tilde\theta) = p(\theta \mid \varphi) p(\tilde\theta\mid \varphi) p(\varphi)= p( \varphi, \theta ) \; p( \varphi, \tilde\theta ) \frac{1}{p(\varphi)} $.
+
+From here is easy to see two particular cases of the $\eta$-smi posterior: the cut model $p_{\eta-smi}(\varphi,\theta \mid Z,Y) = p_{cut}(\varphi,\theta \mid Z,Y)$ when $\eta=0$; and the conventional posterior
+ $p_{\eta-smi}(\varphi,\theta \mid Z,Y) = p(\varphi,\theta \mid Z,Y)$ when $\eta=1$.
+
+\section{Analysis with (Semi-)Modular Inference} \label{sec:smi_considerations}
+
+\subsection{Coherent update of beliefs}
+In \cite{Bissiri2016}, the conventional update of beliefs provided by Bayes theorem is expanded, providing a generalised framework in which alternative inferential options are justified beyond the conventional posterior.
+
+The framework to some extent relies on the idea that an update of beliefs must exist. This update of beliefs is performed, under a decision theory framework, by a function $\psi$, which turns the prior into posterior beliefs by incorporating new observed data $y$ via a loss function $l(\theta;y)$, that is
+\begin{equation*}
+  p(\theta \mid y) = \psi\{ l(\theta;y) , p(\theta) \}
+\end{equation*}
+
+Such update $\psi$ is \textbf{Coherent} if it ensures that we end up with the same posterior, whether we update our beliefs by observing all data simultaneously or by observing the data sequentially,
+\begin{equation*}
+  \psi\{ l(\theta;x_2) , \psi\{ l(\theta;x_1) , p(\theta) \} \} = \psi\{ l(\theta;x_1)+l(\theta;x_2) , p(\theta) \}
+\end{equation*}
+
+They show that an optimal, valid and coherent update of beliefs is of the form
+\begin{equation*}
+	p(\theta \mid y ) = \psi\{ l(\theta;y) , p(\theta) \} = \frac{ \exp\{ -l(\theta;y) \} \; p(\theta) }{\int \exp\{ -l(\theta;y) \} \; p(\theta) \; d\theta}
+\end{equation*}
+
+The flexibility of the framework stablished by \cite{Bissiri2016} allows us to analyse the SMI posterior and the cut model posterior as alternative updates of beliefs. From Eq.~\ref{eq:smi_post} we can see that the loss function underlying the SMI posterior is
+\begin{equation} \label{eq:smi_loss}
+  l_{\eta-smi}( (\varphi,\theta,\tilde\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) - \eta \log p(Y \mid \varphi,\tilde\theta) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi) .
+\end{equation}
+Similarly, from Eq.~\ref{eq:cut_post} we can see that the loss function for the cut model is
+\begin{equation} \label{eq:cut_loss}
+  l_{cut}( (\varphi,\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi).
+\end{equation}
+
+
+\subsection{Coherence of the SMI posterior} \label{sec:suppl_cut_consistency}
+Here we demonstrate that the smi posterior preserve multi-modular coherence. In multi-modular settings, coherence must hold in two ways: 1) by observing responses from different modules one after the other (i.e. first $Z$, and then $Y$); and 2) by observing sequential fragments within the same module (e.g. first $Z_1$, and then $Z_2$, with $Z=(Z_1,Z_2)$).
+
+The SMI posterior in Eq.~\ref{eq:smi_post} updates the belief distribution by observing the two datasets simultaneously. Nevertheless, we can also update by observing data only from one module at a time, and still preserve loss function in eq.\ref{eq:smi_loss}.
+
+Say our current distribution of beliefs about $(\varphi,\theta, \tilde\theta)$ is $p(\varphi,\theta, \tilde\theta)$. Our updated belief by observing \textit{only} $Z$ would be
+\begin{align} \label{eq:smi_post_z}
+ p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Z ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
+ &= p(Z \mid \varphi) \; \frac{1}{ p(Z ) } p(\varphi, \theta, \tilde\theta) \\
+ &= p(Z \mid \varphi) \frac{ 1 }{ \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) \nonumber
+\end{align}
+
+similarly, if we observe \textit{only} $Y$ our updated beliefs are
+\begin{align} \label{eq:smi_post_y}
+ p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Y) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Y ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
+ &= p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p( Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ &= p( Y \mid \varphi, \tilde \theta )^\eta \; p( Y \mid \varphi,  \theta ) \frac{ 1 }{ \int \int p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta} \frac{ p(\varphi) }{ \int  p( Y \mid \varphi,  \theta ) \; p(\varphi, \theta ) \;  d\theta} p(\varphi, \theta, \tilde\theta) \nonumber
+\end{align}
+
+\subsubsection{Coherence under sequential modules}
+
+First, we show that the update from prior to posterior, is equivalent to updating sequentially first $Z$ and then $Y$. This is (a)=(b)+(c) in the following diagram:
+
+\begin{tikzcd}
+p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(b)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z) \ar[r,"(c)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z,Y)
+\end{tikzcd}
+
+The update (a) is given by Equation~\ref{eq:smi_post}.
+
+The update (b) is in Eq.~\ref{eq:smi_post_z}
+\begin{align} \label{eq:smi_update_b}
+ p_{(b)}(\varphi,\theta,\tilde\theta \mid Z) &= p(Z \mid \varphi) \; \frac{1}{ p(Z)} p(\varphi, \theta, \tilde\theta) \nonumber \\
+ &= p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta).
+\end{align}
+
+The update (b)+(c) is equivalent to Eq.~\ref{eq:smi_post_y} substituting the current beliefs with $p_{(b)}(\varphi,\theta,\tilde\theta \mid Z)$
+\begin{align*}
+ p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y) &\propto p( Y \mid \varphi, \tilde \theta )^\eta p( Y \mid \varphi,  \theta ) \frac{ p_{(b)}(\varphi \mid Z) }{ \int  p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta \mid Z ) \;  d\theta} p_{(b)}(\varphi, \theta, \tilde\theta \mid Z)\\
+ &\propto p(Z \mid \varphi) p( Y \mid \varphi, \tilde \theta )^\eta p( Y \mid \varphi,  \theta ) \frac{ 1 }{ P(Y \mid \varphi )_{\theta} } p(\varphi, \theta, \tilde\theta).
+\end{align*}
+
+The equivalence $p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is clear by comparing the last formula with smi posterior in Eq.~\ref{eq:smi_post}. For the last line, we used the following identity
+\begin{align*}
+ \frac{ p_{(b)}(\varphi \mid Z) }{ \int  p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta \mid Z ) \;  d\theta } &=\frac{ \int \int p_{(b)}(\varphi, \theta, \tilde\theta\mid Z) d\theta d\tilde\theta }{ \int  \int p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta, \tilde\theta\mid Z ) \;  d\theta d\tilde\theta } \\
+ &= \frac{ \int \int p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) d\theta d\tilde\theta}{ \int \int p( Y \mid \varphi,  \theta ) \; p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) \;  d\theta d\tilde\theta } \\
+ &=\frac{ p(\varphi ) }{ \int  p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) \;  d\theta} \\
+ &= \frac{1}{p(Y \mid \varphi)_{\theta}}.
+\end{align*}
+
+Now, we want a similar result by first observing $Y$ and then $Z$, i.e. (a)=(d)+(e) in the following diagram
+
+\begin{tikzcd}
+p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(d)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y) \ar[r,"(e)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z,Y)
+\end{tikzcd}
+
+The update (a) is again given by Equation~\ref{eq:smi_post}.
+
+The update (d) is Eq.~\ref{eq:smi_post_y}
+\begin{equation} \label{eq:smi_update_d}
+ p_{(d)}(\varphi,\theta,\tilde\theta \mid Y) \propto p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta).
+\end{equation}
+
+The update (d)+(e) is equivalent to Eq.~\ref{eq:smi_post_z} substituting the current beliefs with $p_{(d)}(\varphi,\theta,\tilde\theta \mid Y)$
+\begin{align*}
+ p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y) &\propto p( Z \mid \varphi) \; p_{(d)}(\varphi, \theta, \tilde\theta \mid Y ) \\
+ &= p( Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \; p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta).
+\end{align*}
+The equivalence $p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is direct from comparing the last formula with Eq.~\ref{eq:smi_post}.
+
+\subsubsection{Coherence under data partition from the same module}
+
+Now we verify that the smi posterior is coherent when observing a sequential portions of the same module. Define the partitions $Z=(Z_1,Z_2)$ and $Y=(Y_1,Y_2)$.
+
+First, we verify coherence for the partition of data $Z$. We want to check (b)=(b1)+(b2) in the following diagram.
+\begin{tikzcd}
+p(\varphi,\theta) \ar[rr,"(b)", bend left=10] \ar[r,"(b1)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z_1) \ar[r,"(b2)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z)
+\end{tikzcd}
+
+Update (b) is the same as defined above in Equation~\ref{eq:smi_update_b}
+
+Updates (b1) and (b2) are similar to Eq.~\ref{eq:smi_post_z}, substituting the corresponding $Z$ and current state of beliefs
+\begin{align*}
+ p_{(b1)}(\varphi,\theta,\tilde\theta \mid Z_1) &= p(Z_1 \mid \varphi) \; \frac{1}{  \int p(Z_1 \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta), \\
+ p_{(b1)+(b2)}(\varphi,\theta,\tilde\theta \mid Z_1,Z_2) &= p(Z_2 \mid \varphi) \; \frac{1}{  \int p_{(b1)}(Z_2 \mid \varphi) \; p_{(b1)}(\varphi \mid Z_1) \; d\varphi } p_{(b1)}(\varphi, \theta, \tilde\theta \mid Z_1) \\
+ &\propto p(Z_1 \mid \varphi) \; p(Z_2 \mid \varphi) \; p(\varphi, \theta, \tilde\theta ) \\
+ &= p(Z \mid \varphi) \; p(\varphi, \theta, \tilde\theta ),
+\end{align*}
+clearly $p_{(b1)+(b2)}(\varphi,\theta,\tilde\theta \mid Z_1,Z_2)=p_{(b)}(\varphi,\theta,\tilde\theta \mid Z)$.
+
+Lastly, we verify coherence for the partition of data $Y$. We want to check (d)=(d1)+(d2) in the following diagram.
+
+\begin{tikzcd}
+p(\varphi,\theta) \ar[rr,"(d)", bend left=10] \ar[r,"(d1)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y_1) \ar[r,"(d2)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y)
+\end{tikzcd}
+
+Update (d) is the same as defined above in Equation~\ref{eq:smi_update_d}
+
+Updates (d1) and (d2) are similar to Eq.~\ref{eq:smi_post_y}, substituting the corresponding $Y$ and current state of beliefs
+\begin{align*}
+ p_{(d1)}(\varphi,\theta,\tilde\theta \mid Y_1) = & p(Y_1 \mid \varphi, \tilde\theta )^{\eta} p(Y_1 \mid \varphi, \theta ) \; \frac{1}{ p( Y_{1 ,\eta} )_{\tilde\theta} \; p(Y_1 \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ \propto & p(Y_1 \mid \varphi, \tilde\theta )^{\eta} p(Y_1 \mid \varphi, \theta ) \; \frac{1}{ p(Y_1 \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ = & p( Y_1 \mid \varphi, \tilde \theta )^\eta \; p( Y_1 \mid \varphi,  \theta ) \frac{ p(\varphi) }{ \int  p( Y_1 \mid \varphi,  \theta ) \; p(\varphi, \theta ) \;  d\theta} p(\varphi, \theta, \tilde\theta) \nonumber \\
+ p_{(d1)+(d2)}(\varphi,\theta,\tilde\theta \mid Y_1,Y_2) \propto & p( Y_2 \mid \varphi, \tilde \theta )^\eta \; p( Y_2 \mid \varphi,  \theta ) \frac{ p_{(d1)}(\varphi) }{ \int  p( Y_2 \mid \varphi,  \theta ) \; p_{(d1)}(\varphi, \theta ) \;  d\theta} p_{(d1)}(\varphi, \theta, \tilde\theta) \nonumber \\
+\propto & \left( p(Y_1 \mid \varphi, \tilde\theta ) \; p(Y_2 \mid \varphi, \tilde\theta ) \right)^{\eta} \left( p(Y_1 \mid \varphi, \theta ) \; p(Y_2 \mid \varphi, \theta ) \right) \cdot \\
+ & \cdot \frac{ p_{(d1)}(\varphi) }{ \int  p( Y_2 \mid \varphi,  \theta ) \; p_{(d1)}(\varphi, \theta ) \;  d\theta} \frac{ 1 }{ p( Y_1 \mid \varphi )_{\theta} } p(\varphi,\theta,\tilde\theta) \\
+\propto & p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta).
+\end{align*}
+from here is clear that $p_{(d1)+(d2)}(\varphi,\theta,\tilde\theta \mid Y_1,Y_2)=p_{(d)}(\varphi,\theta,\tilde\theta \mid Y)$. In the last step, we used the following identity
+\begin{align*}
+\frac{ p_{(d1)}(\varphi) }{ \int  p( Y_2 \mid \varphi,  \theta ) \; p_{(d1)}(\varphi, \theta ) \;  d\theta}  &= \frac{ \int \int p_{(d1)}(\varphi, \theta, \tilde\theta) d\theta d\tilde\theta }{ \int \int p( Y_2 \mid \varphi,  \theta ) \; p_{(d1)}(\varphi, \theta, \tilde\theta ) \;  d\theta d\tilde\theta}\\
+&\propto \frac{ \int \int p( Y_1 \mid \varphi, \tilde \theta )^\eta \; p( Y_1 \mid \varphi,  \theta ) \frac{1}{ p(Y_1 \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) d\theta d\tilde\theta }{ \int \int p( Y_2 \mid \varphi,  \theta ) \; p( Y_1 \mid \varphi, \tilde \theta )^\eta \; p( Y_1 \mid \varphi,  \theta ) \frac{1}{ p(Y_1 \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \;  d\theta d\tilde\theta} \\
+&= \frac{ \frac{1}{p(\varphi)} \left( \int p( Y_1 \mid \varphi, \tilde \theta )^\eta p(\varphi, \tilde\theta) d\tilde\theta \right) \left(\int  p( Y_1 \mid \varphi,  \theta ) p(\varphi, \theta) d\theta \right) }{ \frac{1}{p(\varphi)} \left( \int  p( Y_1 \mid \varphi, \tilde \theta )^\eta p(\varphi, \tilde\theta) \;  d\tilde\theta \right) \left(  \int p( Y_1 \mid \varphi,  \theta ) p( Y_2 \mid \varphi,  \theta ) \; p(\varphi, \theta ) \;  d\theta \right) }\\
+&=\frac{ p(Y_1 \mid \varphi)_{\theta} }{ p(Y \mid \varphi)_{\theta} }
+\end{align*}
+here again, we assumed that $\theta$ and $\tilde\theta$ are conditionally independent given $\varphi$ in the prior, so $ p(\varphi, \theta, \tilde\theta) = p( \varphi, \theta ) \; p( \varphi, \tilde\theta ) \frac{1}{p(\varphi)} $.
+
+\subsection{Detailed balance of SMI posterior}
+
+Here we show that the $\eta$-smi posterior (and cut posterior in particular) preserves detail balance with the transition kernel implied by a two-stage update using two conditional distributions
+
+\begin{enumerate}
+    \item Sample $(\varphi,\tilde\theta) \sim p_{\eta-pow}(\varphi, \tilde\theta \mid Z, Y) = p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} } p(\varphi, \tilde\theta) $
+    \item Sample $\theta \sim p( \theta \mid Y,\varphi )=p(Y \mid \varphi, \theta ) \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\theta) $
+\end{enumerate}
+
+The first step updates $(\varphi,\tilde\theta)$ using the powered likelihood. It is not difficult to target this posterior using traditional sampling methods.
+
+The second term updates $\theta$ exactly from its conditional posterior given data $Y$ from module 2, and a \textit{fixed} value $\varphi$.
+
+The transition kernel for one iteration in this scheme is given by
+\begin{equation} \label{eq:smi_kernel}
+K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta)= K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) p(\theta' \mid Y,\varphi').
+\end{equation}
+
+By construction, the first stage of the update (using the powered likelihood) is in detailed balance with the powered likelihood, i.e. satisfies
+\begin{equation*}
+p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) = p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')
+\end{equation*}
+
+From here we see that the $\eta$-smi posterior in Eq.~\ref{eq:smi_post} satisfies detailed balance with the transition kernel in eq.
+\ref{eq:smi_kernel}
+
+\begin{align*}
+p_{\eta-smi}&(\varphi,\theta,\tilde\theta \mid Z,Y) K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta) \\
+&= [ p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y)p(\theta \mid Y,\varphi) ][ K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) p(\theta' \mid Y,\varphi') ] \\
+&= p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y) p(\theta \mid Y,\varphi) \frac{p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')}{p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y)} p(\theta' \mid Y,\varphi')\\
+&= p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) p(\theta' \mid Y,\varphi') K(\varphi,\tilde\theta \mid \varphi',\tilde\theta') p(\theta \mid Y,\varphi)\\
+&=p_{\eta-smi}(\varphi',\theta',\tilde\theta' \mid Z,Y) K(\varphi,\theta,\tilde\theta \mid \varphi',\theta',\tilde\theta')
+\end{align*}
+
+
+\subsection{Scalability of MCMC. Big-O runtime and bottlenecks}
+
+Our baseline is standard Bayes-MCMC on the original full model.
+Let $\tau_{\phi,\theta}$ be the Integrated Autocorrelation Time (IACT) of Bayes-MCMC. If the Effective Sample Size (ESS) is $N$ then we have $T=N\tau_{\phi,\theta}$ MCMC steps. If one Bayes-MCMC step has unit cost then the overall cost is $W_{BM}=T$[time]. This doesn't parallelise.
+
+The SMI posterior is \[
+p_{\eta-smi}(\phi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\phi,\tilde\theta|Y,Z)p(\theta|Y,\phi).
+\]
+If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\phi,\tilde\theta|Y,Z)$ then the work sampling $(\phi,\tilde\theta)$ is $W_{Bayes}$. Thin the $\phi$ samples every $\tau_{\phi,\theta}$ steps to get
+an ESS about $N$ (rough but reasonable).
+
+Again we use the Bayes-MCMC update for $p(\theta|Y,\phi)$ in SMI. Let $\tau_\theta$ be the IACT. Typically, $\tau_\theta<\tau_{\phi,\theta}$ (lower dimension, proof in special case) so take $\tau_\theta=\tau_{\phi,\theta}$ (conservative).
+We run the $\theta$-sampler to equilibrium (initialise $\theta^{(t)}$-run with $\theta^{(t-1)}$). Suppose this takes $K\tau_\theta$ steps ($K\approx 5$ is reasonable).
+We have $M_{t}$ threads on each of $M_{p}$ machines and $\theta$-sampling parallelizes with small communication overhead.
+A runtime cost for $\theta$-updates equal 1 is conservative, as Bayes-MCMC did $(\phi,\theta)$-updates, so $(\phi,\theta)$-sampling at one $\eta$-value costs about \[
+W_{\eta}=W_{BM}(1+K/M_{t}).
+\]
+Now repeat for $J$ $\eta$-values ($J\approx 20$) using $M_{p}$ machines. Total cost is
+\[
+W_{smi}=W_{Bayes}(1+K/M_{t}) \times J/M_{p}.
+\]
+For eg if we assign resources as $M_{p}=J$ and $M_{t}=1$ (use threads for coarse grained stuff) the SMI cost is about $5-10$ times Bayes-MCMC. This reflects our experience.
+
+Finally, we compute and smooth the WAIC across the $J$ runs. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly, \[ W_{smi}\simeq 10 W_{Bayes} \] should be achievable without alot of work.
+
+
+\bibliographystyle{apalike} %use the apalike bibliography style
+\bibliography{Mendeley} % Mendeley bibliography
+
+\end{document}

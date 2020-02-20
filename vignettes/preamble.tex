@@ -1,0 +1,61 @@
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}      % microtypography
+\usepackage{subfigure}
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+
+\usepackage{multicol} % text in multiple columns
+
+\usepackage{todonotes}
+
+%\usepackage[margin=1in]{geometry}
+%\usepackage{times} % Set the typeface to Times Roman
+
+\usepackage{afterpage}
+\usepackage{graphicx}
+%\graphicspath{{img/}} % define folder with images
+
+
+%\usepackage[ruled, lined, longend, linesnumbered]{algorithm2e}
+\usepackage{algorithm}% http://ctan.org/pkg/algorithm
+\usepackage{algorithmic}% http://ctan.org/pkg/algorithm
+
+\usepackage{amsmath,amssymb,amsthm,amsfonts} % for math equations
+%\usepackage{breqn} % automatic multiline math equations
+
+%\usepackage{bbm} % richer fonts in math environment
+%\usepackage[cal=boondox]{mathalfa} % for math calligraphy, specially lowercase
+
+\newtheorem{theorem}{Theorem}[section]
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+% Some math symbols
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\E}{\mathbb{E}}
+
+% tikz package for drawing
+\usepackage{tikz}
+\usetikzlibrary{cd} %for commutative diagrams
+\usetikzlibrary{backgrounds}
+% For graphical models
+\usetikzlibrary{fit,positioning,arrows.meta,bayesnet,shapes.geometric,chains,matrix,scopes,calc,decorations.markings}
+   \tikzstyle{param}=[circle, minimum size = 1cm, thick, draw=black!100, fill = gray!10, node distance = 1cm]
+   \tikzstyle{data}=[rectangle, minimum size = 1cm, thick, draw =black!100, node distance = 1cm]
+   \tikzstyle{model}=[rectangle, minimum size = 2cm, rounded corners, thick, draw =black!50, node distance = 0.75cm]
+
+% \usepackage[round]{natbib} % richer citation
+\usepackage{natbib} % richer citation
+\usepackage{breakcites} % avoid overfull hbox for long cites

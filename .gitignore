@@ -1,0 +1,14 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+doc
+inst/doc
+inst/include/aistats2020smi*.h
+man
+Meta
+**/**/.DS_Store
+**/**/RcppExports.cpp
+**/**/RcppExports.R
+src/*.o
+src/*.so
