@@ -20,7 +20,7 @@ if(!all(req.pck_bool)) {
 # Parallel processing
 parallel_comp = TRUE
 if(parallel_comp){
-  n_cores = 6
+  n_cores = 20
   options(cores=n_cores)
   doParallel::registerDoParallel()
   getDoParWorkers()
@@ -56,6 +56,7 @@ if(F) {
   post_eta_all = foreach::foreach(eta = eta_all,.combine='comb', .multicombine=TRUE) %do% {
     # eta = 0.01
     posterior = aistats2020smi::mu_b_bt_post( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, gamma=gamma, rho=rho, rho_tilde=rho, eta=eta )
+    # posterior1 = aistats2020smi::mu_b_post( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, gamma=gamma, rho=rho, eta=eta )
     list( t(posterior[[1]]), diag(posterior[[2]]) )
   }
   
@@ -92,7 +93,7 @@ if(F) {
 
 # Illustrate convenience of SMI in expectation #
 if(T) {
-  set.seed(1)
+  set.seed(0)
   
   # Average Mean Square Error #
   
@@ -117,9 +118,9 @@ if(T) {
   param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
   MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[2]]-param_true_array)^2
   
-  # eta_i=1; iter_i=250
-  # MSE_all_iter[eta_i,,iter_i]
-  # post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[2]][eta_i,,iter_i]-param_true)^2
+  eta_i=2; iter_i=250
+  MSE_all_iter[eta_i,,iter_i]
+  post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[2]][eta_i,,iter_i]-param_true)^2
   
   # Average across iterations
   post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
@@ -128,6 +129,7 @@ if(T) {
   
   
   # Posterior vs True value
+  aistats2020smi::set_ggtheme()
   post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
     
     p = data.frame( eta=eta_all,
@@ -142,7 +144,7 @@ if(T) {
     p
   }
   p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
-  print(p)
+  # print(p)
   
   # MSE
   aistats2020smi::set_ggtheme()
@@ -155,7 +157,8 @@ if(T) {
       labs(y=paste(param_names[par_i]," MSE",sep=""))
     p
   }
-  cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
+  p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
+  # print(p)
   
   # b vs b_tilde
   aistats2020smi::set_ggtheme()
@@ -163,7 +166,7 @@ if(T) {
     `colnames<-`(param_names) %>%
     as.data.frame() %>%
     mutate(eta=eta_all) %>%
-    tidyr::pivot_longer(cols=param_names,names_to='parameter') %>%
+    tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
     dplyr::filter(parameter %in% c('b','b_tilde')) %>%
     ggplot() +
     geom_line( aes(x=eta,y=value,col=parameter) ) +

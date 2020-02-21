@@ -19,7 +19,7 @@ mu_b_bt_post = function( Z, Y, sigma_z, sigma_y, gamma, rho, rho_tilde, eta=1 ){
   # rho_tilde = rho * 1
   
   A = matrix(0,3,3)
-  A[1,1] = (n/(sigma_z^2)) + (m/(sigma_y^2)) * (1+eta) + 1 / gamma^2 - (m/(sigma_y^2+m*rho^2))
+  A[1,1] = (n/(sigma_z^2)) + (m/(sigma_y^2)) * (1+eta) - (m/(sigma_y^2+m*rho^2)) + 1/(gamma^2)
   A[2,2] = m/(sigma_y^2) + 1/(rho^2)
   A[3,3] = eta * m/(sigma_y^2) + 1/(rho_tilde^2)
   A[1,2] = A[2,1] = m/(sigma_y^2)
@@ -28,7 +28,7 @@ mu_b_bt_post = function( Z, Y, sigma_z, sigma_y, gamma, rho, rho_tilde, eta=1 ){
   cov = solve(A)
   
   aux = matrix(0,3,1)
-  aux[1,1] = sum(Z)/sigma_z^2 + (sum(Y)/sigma_y^2) * ( (eta*(sigma_y^2 + m*rho^2) + m*rho^2)/(sigma_y^2 + m*rho^2))
+  aux[1,1] = sum(Z)/sigma_z^2 + (sum(Y)/sigma_y^2) * ( (eta*(sigma_y^2 + m*rho^2) + m*rho^2) / (sigma_y^2 + m*rho^2) )
   aux[2,1] = sum(Y)/sigma_y^2
   aux[3,1] = eta*sum(Y)/sigma_y^2
   mean = cov %*% aux
@@ -47,13 +47,13 @@ mu_b_post = function( Z, Y, sigma_z, sigma_y, gamma, rho, eta=1 ){
   m = length(Y)
   
   A = matrix(0,2,2)
-  A[1,1] = (n/(sigma_z^2)) + (m/(sigma_y^2)) * (( eta*sigma_y^2 + m * rho^2)/( sigma_y^2 + m * rho^2)) + 1 / gamma^2
-  A[1,2] = A[1,0] = m/(sigma_y^2)
+  A[1,1] = (n/(sigma_z^2)) + (m/(sigma_y^2)) * ( ( eta*sigma_y^2 + m * rho^2) / ( sigma_y^2 + m * rho^2) ) + 1 / gamma^2
+  A[1,2] = A[2,1] = m/(sigma_y^2)
   A[2,2] = m/(sigma_y^2) + 1/(rho^2)
   cov = solve(A)
   
   aux = matrix(0,2,1)
-  aux[1,1] = sum(Z)/sigma_z^2 + (sum(Y)/sigma_y^2) * ((eta*sigma_y^2 + m * rho^2)/(sigma_y^2 + m * rho^2))
+  aux[1,1] = sum(Z)/sigma_z^2 + (sum(Y)/sigma_y^2) * ( (eta*sigma_y^2 + m * rho^2) / (sigma_y^2 + m * rho^2) )
   aux[2,1] = sum(Y)/sigma_y^2
   mean = cov %*% aux
   return( list(mean, cov) )
