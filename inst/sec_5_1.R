@@ -20,11 +20,16 @@ if(!all(req.pck_bool)) {
 # Parallel processing
 parallel_comp = TRUE
 if(parallel_comp){
-  n_cores = 20
+  n_cores = 25
   options(cores=n_cores)
   doParallel::registerDoParallel()
   getDoParWorkers()
 }
+
+
+# auxilliar functions used in foreach loops #
+comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
+acomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
 
 ### Generative (true) parameters ###
 
@@ -51,17 +56,17 @@ if(F) {
   Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
   cat('Z_mean=',mean(Z),'; Y_mean=',mean(Y))
   
-  comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
-  # acomb <- function(...) { abind(..., along=3) }
   post_eta_all = foreach::foreach(eta = eta_all,.combine='comb', .multicombine=TRUE) %do% {
     # eta = 0.01
+    # Compute posterior mean and variance
     posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta )
     list( t(posterior[[1]]), diag(posterior[[2]]) )
   }
+  # Compute MSE
+  mse_eta_all = post_eta_all[[2]] + ( post_eta_all[[1]] - t( matrix(param_true,3,length(eta_all)) ) )^2
   
+  # Plot posterior vs true value
   aistats2020smi::set_ggtheme()
-  
-  # Posterior vs True value
   post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
     
     p = data.frame( eta=eta_all,
@@ -77,17 +82,30 @@ if(F) {
   }
   cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
   
-  # MSE
+  # Plot MSE
   mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
     # par_i=3
     p = data.frame( eta=eta_all,
-                    mse=post_eta_all[[2]][,par_i] + (post_eta_all[[1]][,par_i]-param_true[par_i])^2 ) %>%
+                    mse=mse_eta_all[,par_i] ) %>%
       ggplot() + 
       geom_line( aes(x=eta,y=mse), col='red' ) +
-      labs(y=paste(param_names[par_i]," MSE",sep=""))
+      labs(y=paste("MSE ",param_names[par_i],sep=""))
     p
   }
   cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
+  
+  # Compare theta vs theta_tilde
+  p = mse_eta_all %>%
+    `colnames<-`(param_names) %>%
+    as.data.frame() %>%
+    mutate(eta=eta_all) %>%
+    tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
+    dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
+    ggplot() +
+    geom_line( aes(x=eta,y=value,col=parameter) ) +
+    labs(y="MSE theta")
+  print(p)
+  
 }
 
 # Illustrate convenience of SMI in expectation #
@@ -98,8 +116,6 @@ if(T) {
   
   # Compute Posterior mean and sd for each iteration
   n_iter = 1000
-  comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
-  acomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
   post_eta_all_iter = foreach::foreach(iter_i = 1:n_iter,.combine='acomb', .multicombine=TRUE)  %dorng% {
     # iter_i=1
     Z = rnorm( n=n, mean=phi, sd=sigma_z)
@@ -109,17 +125,19 @@ if(T) {
       posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
       list( t(posterior[[1]]), diag(posterior[[2]]) )
     }
-    # post_eta_all[[1]]
+    # mse_eta_all = post_eta_all[[2]] + ( post_eta_all[[1]] - t( matrix(param_true,3,length(eta_all)) ) )^2
+    
     post_eta_all
   }
   
   # Compute MSE for each iteration
   param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
-  MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[2]]-param_true_array)^2
+  MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[1]]-param_true_array)^2
   
-  eta_i=2; iter_i=250
-  MSE_all_iter[eta_i,,iter_i]
-  post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[2]][eta_i,,iter_i]-param_true)^2
+  # # Verifying array computation of MSE
+  # eta_i=2; iter_i=230
+  # MSE_all_iter[eta_i,,iter_i]
+  # post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[1]][eta_i,,iter_i]-param_true)^2
   
   # Average across iterations
   post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
@@ -127,7 +145,7 @@ if(T) {
   MSE_average = apply(MSE_all_iter,c(1,2),mean)
   
   
-  # Posterior vs True value
+  # Plot posterior vs true value
   aistats2020smi::set_ggtheme()
   post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
     
@@ -145,7 +163,7 @@ if(T) {
   p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
   # print(p)
   
-  # MSE
+  # Plot MSE
   aistats2020smi::set_ggtheme()
   mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
     # par_i=3
@@ -159,16 +177,16 @@ if(T) {
   p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
   # print(p)
   
-  # b vs b_tilde
+  # Compare theta vs theta_tilde
   aistats2020smi::set_ggtheme()
   p = MSE_average %>%
     `colnames<-`(param_names) %>%
     as.data.frame() %>%
     mutate(eta=eta_all) %>%
     tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
-    dplyr::filter(parameter %in% c('b','b_tilde')) %>%
+    dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
     ggplot() +
     geom_line( aes(x=eta,y=value,col=parameter) ) +
-    labs(y="MSE average")
-  p
+    labs(y="MSE average theta")
+  # print(p)
 }
