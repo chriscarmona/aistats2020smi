@@ -28,7 +28,7 @@ if(parallel_comp){
 
 
 # auxilliar functions used in foreach loops #
-comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
+lrcomb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
 lacomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
 acomb <- function(...) {abind(..., along=3)}
 
@@ -57,7 +57,7 @@ if(F) {
   Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
   cat('Z_mean=',mean(Z),'; Y_mean=',mean(Y))
   
-  post_eta_all = foreach::foreach(eta = eta_all,.combine='comb', .multicombine=TRUE) %do% {
+  post_eta_all = foreach::foreach(eta = eta_all,.combine='lrcomb', .multicombine=TRUE) %dopar% {
     # eta = 0.01
     # Compute posterior mean and variance
     posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta )
@@ -110,35 +110,29 @@ if(F) {
 }
 
 # Illustrate convenience of SMI in expectation #
-if(T) {
+if(F) {
   set.seed(0)
   
   # Average Mean Square Error #
   
   # Compute Posterior mean and sd for each iteration
   n_iter = 1000
-  post_eta_all_iter = foreach::foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %dorng% {
-    # iter_i=1
-    Z = rnorm( n=n, mean=phi, sd=sigma_z)
-    Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
-    post_eta_all = foreach::foreach(eta_i = seq_along(eta_all), .combine='comb', .multicombine=TRUE) %do% {
+  Z = matrix(rnorm( n=n*n_iter, mean=phi, sd=sigma_z),n_iter,n)
+  Y = matrix(rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y ),n_iter,m)
+  post_eta_all_iter = foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %:%
+    foreach(eta_i = seq_along(eta_all), .combine='lrcomb', .multicombine=TRUE) %dopar% {
       # eta_i=1
-      posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
       list( t(posterior[[1]]), diag(posterior[[2]]) )
-    }
-    # mse_eta_all = post_eta_all[[2]] + ( post_eta_all[[1]] - t( matrix(param_true,3,length(eta_all)) ) )^2
-    
-    post_eta_all
   }
-  
   # Compute MSE for each iteration
   param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
   MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[1]]-param_true_array)^2
   
-  # # Verifying array computation of MSE
-  # eta_i=2; iter_i=230
-  # MSE_all_iter[eta_i,,iter_i]
-  # post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[1]][eta_i,,iter_i]-param_true)^2
+  # Verifying array computation of MSE
+  eta_i=2; iter_i=5
+  MSE_all_iter[eta_i,,iter_i]
+  post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[1]][eta_i,,iter_i]-param_true)^2
   
   # Average across iterations
   post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
@@ -194,8 +188,8 @@ if(T) {
 
 
 # ELPD: Choosing optimal eta #
-if(T) {
-  set.seed(0)
+if(F) {
+  set.seed(123)
   
   # elpd approximation via Monte Carlo
   n_iter = 1000
@@ -204,17 +198,19 @@ if(T) {
   # generate data from the ground-truth distribution
   Z = matrix( rnorm( n=n*n_iter, mean=phi, sd=sigma_z), n_iter, n )
   Y = matrix( rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y), n_iter, m )
+  # cat('Z_mean=',apply(Z,1,mean),'; Y_mean=',apply(Y,1,mean))
   Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
   Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
   
-  log_pred_eta_all_iter = foreach::foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
-    foreach::foreach( new_i = 1:n_new,.combine=rbind ) %:%
-    foreach::foreach( eta_i = seq_along(eta_all), .combine=c ) %dopar% {
+  log_pred_eta_all_iter = foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
+    foreach( new_i = 1:n_new,.combine=rbind ) %:%
+    foreach( eta_i = seq_along(eta_all), .combine=c ) %dopar% {
       # iter_i=1
       # new_i = 1
       # eta_i=1
-      posterior = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
-      mvtnorm::dmvnorm( x=c(Z_new[iter_i,new_i],Y_new[iter_i,new_i]), mean=posterior[[1]] , sigma=posterior[[2]], log=TRUE )
+      # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      mvtnorm::dmvnorm( x=c(Z_new[iter_i,new_i],Y_new[iter_i,new_i]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
   }
   # average to get elpd
   elpd_eta_all = apply(log_pred_eta_all_iter,2,mean)

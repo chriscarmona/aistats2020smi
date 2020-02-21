@@ -54,9 +54,9 @@ SMI_pred_biased_data = function( Z, Y, sigma_z, sigma_y, sigma_phi, sigma_theta,
   
   A[1,2] = A[2,1] = (m+1)/(sigma_y^2)
   A[1,3] = A[3,1] = eta*m/(sigma_y^2)
-  A[1,4] = A[4,1] = 1/(sigma_z^2)
-  A[1,5] = A[5,1] = 1/(sigma_y^2)
-  A[2,5] = A[5,2] = 1/(sigma_y^2)
+  A[1,4] = A[4,1] = -1/(sigma_z^2)
+  A[1,5] = A[5,1] = -1/(sigma_y^2)
+  A[2,5] = A[5,2] = -1/(sigma_y^2)
   
   b = matrix(0,5,1)
   b[1,1] = sum(Z)/(sigma_z^2) + (1+eta) * sum(Y)/(sigma_y^2) - sum(Y) / (sigma_y^2+m*sigma_theta^2)
@@ -66,5 +66,6 @@ SMI_pred_biased_data = function( Z, Y, sigma_z, sigma_y, sigma_phi, sigma_theta,
   cov = solve(A)
   mean = cov %*% b
   
+  # return( list(mean, cov) )
   return( list(mean[4:5], cov[4:5,4:5]) )
 }
