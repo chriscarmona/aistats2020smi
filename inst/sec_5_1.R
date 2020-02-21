@@ -28,17 +28,17 @@ if(parallel_comp){
 
 ### Generative (true) parameters ###
 
-mu = 0
-b = 1
+phi = 0
+theta = 1
 n=25 # Sample size for Z
 m=50 # Sample size for Y
 sigma_z = 2 # Likelihood variance for Z
 sigma_y = 1 # Likelihood variance for Y
-gamma=Inf # Prior variance mu
-rho=0.5 # Prior variance eta
+sigma_phi=Inf # Prior variance phi
+sigma_theta=0.5 # Prior variance eta
 
-param_names = c('mu','b','b_tilde')
-param_true = c(mu,b,b)
+param_names = c('phi','theta','theta_tilde')
+param_true = c(phi,theta,theta)
 
 # sequence of eta values in (0,1)
 eta_all = seq(0,1,0.01)
@@ -47,16 +47,15 @@ eta_all = seq(0,1,0.01)
 # Illustrate convenience of SMI with one synthetic dataset #
 if(F) {
   set.seed(123)
-  Z = rnorm( n=n, mean=mu, sd=sigma_z)
-  Y = rnorm( n=m, mean=mu+b, sd=sigma_y )
+  Z = rnorm( n=n, mean=phi, sd=sigma_z)
+  Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
   cat('Z_mean=',mean(Z),'; Y_mean=',mean(Y))
   
   comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
   # acomb <- function(...) { abind(..., along=3) }
   post_eta_all = foreach::foreach(eta = eta_all,.combine='comb', .multicombine=TRUE) %do% {
     # eta = 0.01
-    posterior = aistats2020smi::mu_b_bt_post( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, gamma=gamma, rho=rho, rho_tilde=rho, eta=eta )
-    # posterior1 = aistats2020smi::mu_b_post( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, gamma=gamma, rho=rho, eta=eta )
+    posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta )
     list( t(posterior[[1]]), diag(posterior[[2]]) )
   }
   
@@ -103,11 +102,11 @@ if(T) {
   acomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
   post_eta_all_iter = foreach::foreach(iter_i = 1:n_iter,.combine='acomb', .multicombine=TRUE)  %dorng% {
     # iter_i=1
-    Z = rnorm( n=n, mean=mu, sd=sigma_z)
-    Y = rnorm( n=m, mean=mu+b, sd=sigma_y )
-    post_eta_all = foreach::foreach(eta_i = seq_along(eta_all),.combine='comb', .multicombine=TRUE) %do% {
+    Z = rnorm( n=n, mean=phi, sd=sigma_z)
+    Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
+    post_eta_all = foreach::foreach(eta_i = seq_along(eta_all), .combine='comb', .multicombine=TRUE) %do% {
       # eta_i=1
-      posterior = aistats2020smi::mu_b_bt_post( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, gamma=gamma, rho=rho, rho_tilde=rho, eta=eta_all[eta_i] )
+      posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
       list( t(posterior[[1]]), diag(posterior[[2]]) )
     }
     # post_eta_all[[1]]
