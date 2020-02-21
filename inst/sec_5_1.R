@@ -10,7 +10,7 @@ set.seed(0)
 # loading required packages #
 req.pck <- c( "aistats2020smi",
               "tidyverse","foreach","doParallel","doRNG","cowplot",
-              "abind" )
+              "abind","mvtnorm" )
 req.pck_bool <- sapply(X=req.pck,FUN=require,character.only=T)
 if(!all(req.pck_bool)) {
   sapply(X=req.pck[!req.pck_bool],FUN=install.packages,character.only=T);
@@ -29,7 +29,8 @@ if(parallel_comp){
 
 # auxilliar functions used in foreach loops #
 comb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
-acomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
+lacomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
+acomb <- function(...) {abind(..., along=3)}
 
 ### Generative (true) parameters ###
 
@@ -116,7 +117,7 @@ if(T) {
   
   # Compute Posterior mean and sd for each iteration
   n_iter = 1000
-  post_eta_all_iter = foreach::foreach(iter_i = 1:n_iter,.combine='acomb', .multicombine=TRUE)  %dorng% {
+  post_eta_all_iter = foreach::foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %dorng% {
     # iter_i=1
     Z = rnorm( n=n, mean=phi, sd=sigma_z)
     Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
@@ -189,4 +190,38 @@ if(T) {
     geom_line( aes(x=eta,y=value,col=parameter) ) +
     labs(y="MSE average theta")
   # print(p)
+}
+
+
+# ELPD: Choosing optimal eta #
+if(T) {
+  set.seed(0)
+  
+  # elpd approximation via Monte Carlo
+  n_iter = 1000
+  n_new = 1000
+  
+  # generate data from the ground-truth distribution
+  Z = matrix( rnorm( n=n*n_iter, mean=phi, sd=sigma_z), n_iter, n )
+  Y = matrix( rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y), n_iter, m )
+  Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
+  Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
+  
+  log_pred_eta_all_iter = foreach::foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
+    foreach::foreach( new_i = 1:n_new,.combine=rbind ) %:%
+    foreach::foreach( eta_i = seq_along(eta_all), .combine=c ) %dopar% {
+      # iter_i=1
+      # new_i = 1
+      # eta_i=1
+      posterior = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      mvtnorm::dmvnorm( x=c(Z_new[iter_i,new_i],Y_new[iter_i,new_i]), mean=posterior[[1]] , sigma=posterior[[2]], log=TRUE )
+  }
+  # average to get elpd
+  elpd_eta_all = apply(log_pred_eta_all_iter,2,mean)
+  
+  aistats2020smi::set_ggtheme()
+  p = data.frame(eta=eta_all, elpd=elpd_eta_all) %>%
+    ggplot() +
+    geom_line( aes(x=eta,y=elpd),col='red' )
+  p
 }
