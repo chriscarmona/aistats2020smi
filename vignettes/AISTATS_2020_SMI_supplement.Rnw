@@ -45,20 +45,32 @@ set.seed(0)
 compute_mcmc = FALSE
 
 # loading required packages #
-req.pck <- c( "aistats2020smi",
-              "tidyverse", "ggplot2",
-              "foreach","doParallel" )
+req.pck <- c( "tidyverse","foreach","doParallel","doRNG","cowplot",
+              "abind","mvtnorm" )
 req.pck <- sapply(X=req.pck,FUN=require,character.only=T)
 if(!all(req.pck)) {
   sapply(X=req.pck[!req.pck],FUN=install.packages,character.only=T);
   sapply(X=req.pck,FUN=require,character.only=T)
 }
 
-# Setting nice ggplot theme settings
-aistats2020smi::set_ggtheme()
+# # Parallel processing
+# parallel_comp = TRUE
+# if(parallel_comp){
+#   n_cores = 25
+#   options(cores=n_cores)
+#   doParallel::registerDoParallel()
+#   getDoParWorkers()
+# }
+
+# auxilliar functions used in foreach loops #
+lrcomb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
+lacomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
+acomb <- function(...) {abind(..., along=3)}
+
 @
 
 \begin{document}
+\SweaveOpts{concordance=TRUE}
 \maketitle
 
 In this document we present additional material which complements the main article. The numbers of sections in this document is aligned with the sections in the main article, for the ease of referencing (this does not apply for subsections and lower levels).
@@ -73,6 +85,11 @@ p(Y_{\eta})_{\tilde\theta} &= \int \int p( Y \mid \varphi, \tilde \theta )^\eta 
 p(Y,\varphi)_{\theta} &= \int  p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) \;  d\theta \\
 p(Y  \mid  \varphi)_{\theta} &= \frac{1}{p(\varphi)} \; p(Y , \varphi)_{\theta}\\
 \end{align*}
+
+All the figures and numerical results presented in the main text and this supplementcan be replicated using our R package, \texttt{aistats2020smi}, available in Github.
+<<load_aistats2020smi, eval=TRUE, echo=FALSE>>=
+library(aistats2020smi)
+@
 
 \setcounter{section}{1}
 
@@ -350,6 +367,74 @@ W_{smi}=W_{Bayes}(1+K/M_{t}) \times J/M_{p}.
 For eg if we assign resources as $M_{p}=J$ and $M_{t}=1$ (use threads for coarse grained stuff) the SMI cost is about $5-10$ times Bayes-MCMC. This reflects our experience.
 
 Finally, we compute and smooth the WAIC across the $J$ runs. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly, \[ W_{smi}\simeq 10 W_{Bayes} \] should be achievable without alot of work.
+
+\section{Data Analyses} \label{sec:data_analyses}
+
+\subsection{Simulation study 1: Biased data}
+
+\begin{multicols}{2}
+Model:
+\begin{align*}
+  Z \mid \varphi &\sim N( \varphi, \sigma_z^2 ) \\
+  Y \mid \varphi, \theta  &\sim N( \varphi + \theta, \sigma_y^2 )
+  % \text{with } & \sigma_z^2, \sigma_y^2 \text{ known}
+\end{align*}
+with $\sigma_z^2$ and $\sigma_y^2$ (and other $\sigma$'s) known.
+
+Priors:
+\begin{align*}
+  \varphi &\sim N( 0, \sigma_\varphi^2 ) \\
+  \theta &\sim N( 0, \sigma_\theta^2 ) \\
+  \tilde\theta &\sim N( 0, \tilde\sigma_\theta^2 )
+\end{align*}
+\end{multicols}
+
+In our example on the main text, we know the generative parameters: $(\varphi^*,\theta^*, \tilde\theta^*)$. We compare these \textit{true} values with the estimates arising from the $\eta$-smi posterior, for different values of $\eta\in[0,1]$.
+
+% \begin{align*}
+%   p( Z \mid \varphi ) &= (2\pi\sigma_z^2)^{-n/2} \exp\{ -\frac{1}{2\sigma_z^2} \sum_{i=1}^n (z_i-\varphi)^2 \} \\
+%   p( Y \mid \varphi,  \theta ) &= (2\pi\sigma_y^2)^{-m/2} \exp\{ -\frac{1}{2\sigma_y^2} \sum_{i=1}^m (y_i-\varphi-\theta)^2 \} \\
+%   p( \varphi ) &= (2\pi\sigma_\varphi^2)^{-1/2} \exp\{ -\frac{1}{2\sigma_\varphi^2} \varphi^2 \} \\
+%   p( \theta ) &= (2\pi\sigma_\theta^2)^{-1/2} \exp\{ -\frac{1}{2\sigma_\theta^2} \theta^2 \} \\
+% \end{align*}
+
+\subsubsection{SMI posterior}
+
+First, derive $p(Y \mid \varphi)_{\theta}$ as a function of $\varphi$
+\begin{align*}
+  p(Y \mid \varphi)_{\theta} &= \frac{1}{p(\varphi)} \; \int  p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) \;  d\theta \\
+  &\propto \exp\{ -\frac{1}{2} [ \varphi^2 ( \frac{m}{m \sigma_\theta^2 + \sigma_y^2 } ) - 2 \varphi (\bar Y \frac{m}{m \sigma_\theta^2 + \sigma_y^2 }) ] \}
+\end{align*}
+
+Now we can obtain the $\eta$-smi posterior
+\begin{align*}
+ p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ &\propto \exp\{ -\frac{1}{2} \; [ \varphi^2 ( \frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) + \frac{1}{\sigma_\varphi^2} - \frac{m}{\sigma_y^2 + m \sigma_\theta^2} ) - 2 \varphi (\frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) - \bar Y \frac{m}{ \sigma_y^2 + m \sigma_\theta^2}) + \\
+ & \hspace{2cm} \theta^2 (\frac{m}{\sigma_y^2} + \frac{1}{\sigma_\theta^2}) - 2 \theta (\bar Y \frac{m}{\sigma_y^2 }) + \\
+ & \hspace{2cm} \tilde\theta^2 ( \eta \frac{m}{\sigma_y^2} + \frac{1}{\tilde\sigma_\theta^2}) - 2 \tilde\theta (\eta \bar Y \frac{m}{\sigma_y^2 }) + \\
+ & \hspace{2cm} + 2 \varphi \theta (\frac{m}{\sigma_y^2}) + 2 \varphi \tilde\theta (\eta \frac{m}{\sigma_y^2 }) ] \}
+\end{align*}
+
+From here we see that the joint posterior distribution for $(\varphi,\theta,\tilde\theta)$ is a multivariate normal distribution defined as:
+\begin{equation} \label{eq:smi_post_5_1}
+p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) = \text{Normal}( \mu, \Sigma ),
+\end{equation}
+
+with
+\begin{equation*}
+  \Sigma = \begin{bmatrix}
+  \frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) - \frac{m}{ \sigma_y^2 + m \sigma_\theta^2 } + \frac{1}{\sigma_\varphi^2} & \frac{m}{\sigma_y^2} & \eta \frac{m}{\sigma_y^2 } \\
+  \frac{m}{\sigma_y^2} & \frac{m}{\sigma_y^2} + \frac{1}{\sigma_\theta^2} & 0 \\
+  \eta \frac{m}{\sigma_y^2 } & 0 &  \eta \frac{m}{\sigma_y^2} + \frac{1}{\tilde\sigma_\theta^2}
+\end{bmatrix}^{-1} \text{, and } \mu = \Sigma \begin{bmatrix}
+  \frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) - \bar Y \frac{m}{ \sigma_y^2 + m \sigma_\theta^2} \\
+  \bar Y \frac{m}{\sigma_y^2 } \\
+  \eta \bar Y \frac{m}{\sigma_y^2 }
+\end{bmatrix}.
+\end{equation*}
+
+<<biased_data_01, eval=TRUE, echo=FALSE>>=
+@
 
 
 \bibliographystyle{apalike} %use the apalike bibliography style

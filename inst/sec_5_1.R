@@ -110,8 +110,8 @@ if(F) {
 }
 
 # Illustrate convenience of SMI in expectation #
-if(F) {
-  set.seed(0)
+if(T) {
+  set.seed(123)
   
   # Average Mean Square Error #
   
@@ -129,10 +129,10 @@ if(F) {
   param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
   MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[1]]-param_true_array)^2
   
-  # Verifying array computation of MSE
-  eta_i=2; iter_i=5
-  MSE_all_iter[eta_i,,iter_i]
-  post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[1]][eta_i,,iter_i]-param_true)^2
+  # # Verifying array computation of MSE
+  # eta_i=2; iter_i=5
+  # MSE_all_iter[eta_i,,iter_i]
+  # post_eta_all_iter[[2]][eta_i,,iter_i] + (post_eta_all_iter[[1]][eta_i,,iter_i]-param_true)^2
   
   # Average across iterations
   post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
@@ -184,40 +184,33 @@ if(F) {
     geom_line( aes(x=eta,y=value,col=parameter) ) +
     labs(y="MSE average theta")
   # print(p)
-}
 
-
-# ELPD: Choosing optimal eta #
-if(F) {
-  set.seed(123)
   
-  # elpd approximation via Monte Carlo
-  n_iter = 1000
+  # ELPD approximation via Monte Carlo
+  set.seed(123)
   n_new = 1000
   
   # generate data from the ground-truth distribution
-  Z = matrix( rnorm( n=n*n_iter, mean=phi, sd=sigma_z), n_iter, n )
-  Y = matrix( rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y), n_iter, m )
-  # cat('Z_mean=',apply(Z,1,mean),'; Y_mean=',apply(Y,1,mean))
   Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
   Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
   
   log_pred_eta_all_iter = foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
-    foreach( new_i = 1:n_new,.combine=rbind ) %:%
-    foreach( eta_i = seq_along(eta_all), .combine=c ) %dopar% {
+    foreach( eta_i = seq_along(eta_all), .combine=rbind ) %dopar% {
       # iter_i=1
       # new_i = 1
       # eta_i=1
       # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
       predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
-      mvtnorm::dmvnorm( x=c(Z_new[iter_i,new_i],Y_new[iter_i,new_i]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
+      mvtnorm::dmvnorm( x=cbind(Z_new[iter_i,],Y_new[iter_i,]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
   }
   # average to get elpd
-  elpd_eta_all = apply(log_pred_eta_all_iter,2,mean)
+  elpd_eta_all = apply(log_pred_eta_all_iter,1,mean)
   
+  # Plot ELPD
   aistats2020smi::set_ggtheme()
   p = data.frame(eta=eta_all, elpd=elpd_eta_all) %>%
     ggplot() +
-    geom_line( aes(x=eta,y=elpd),col='red' )
+    geom_line( aes(x=eta,y=-elpd),col='red' ) +
+    labs(y="-elpd(z,y)")
   p
 }
