@@ -57,10 +57,10 @@ if(T) {
   Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
   cat('Z_mean=',mean(Z),'; Y_mean=',mean(Y))
   
-  post_eta_all = foreach::foreach(eta = eta_all,.combine='lrcomb', .multicombine=TRUE) %dopar% {
-    # eta = 0.01
+  post_eta_all = foreach::foreach(eta_i = seq_along(eta_all),.combine='lrcomb', .multicombine=TRUE) %dopar% {
+    # eta_i = 75
     # Compute posterior mean and variance
-    posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta )
+    posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
     list( t(posterior[[1]]), diag(posterior[[2]]) )
   }
   # Compute MSE

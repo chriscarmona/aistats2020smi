@@ -504,8 +504,9 @@ posterior = SMI_post_biased_data( Z=Z, Y=Y,
                                   sigma_phi=sigma_phi,
                                   sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta,
                                   eta=1 )
+posterior = mapply('rownames<-', posterior, MoreArgs=list(value=param_names), SIMPLIFY=FALSE)
 # posterior mean
-setNames( c(posterior[[1]]), param_names )
+posterior$mean
 @
 
 \begin{figure}[!ht]

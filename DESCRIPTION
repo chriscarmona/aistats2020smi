@@ -11,6 +11,9 @@ LazyData: TRUE
 Imports:
     coda,
     ggplot2,
+    ggthemes,
+    nlme,
+    ordinal,
     Rcpp,
     RcppArmadillo,
     reshape
