@@ -51,7 +51,7 @@ eta_all = seq(0,1,0.01)
 
 
 # Illustrate convenience of SMI with one synthetic dataset #
-if(F) {
+if(T) {
   set.seed(123)
   Z = rnorm( n=n, mean=phi, sd=sigma_z)
   Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
@@ -81,32 +81,33 @@ if(F) {
       labs(y=paste(param_names[par_i]," posterior",sep=""))
     p
   }
-  cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
+  p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
   
-  # Plot MSE
-  mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
-    # par_i=3
-    p = data.frame( eta=eta_all,
-                    mse=mse_eta_all[,par_i] ) %>%
-      ggplot() + 
-      geom_line( aes(x=eta,y=mse), col='red' ) +
-      labs(y=paste("MSE ",param_names[par_i],sep=""))
-    p
+  if(F) {
+    # Plot MSE
+    mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
+      # par_i=3
+      p = data.frame( eta=eta_all,
+                      mse=mse_eta_all[,par_i] ) %>%
+        ggplot() + 
+        geom_line( aes(x=eta,y=mse), col='red' ) +
+        labs(y=paste("MSE ",param_names[par_i],sep=""))
+      p
+    }
+    p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
+    
+    # Compare theta vs theta_tilde
+    p = mse_eta_all %>%
+      `colnames<-`(param_names) %>%
+      as.data.frame() %>%
+      mutate(eta=eta_all) %>%
+      tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
+      dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
+      ggplot() +
+      geom_line( aes(x=eta,y=value,col=parameter) ) +
+      labs(y="MSE theta")
+    print(p)
   }
-  cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
-  
-  # Compare theta vs theta_tilde
-  p = mse_eta_all %>%
-    `colnames<-`(param_names) %>%
-    as.data.frame() %>%
-    mutate(eta=eta_all) %>%
-    tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
-    dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
-    ggplot() +
-    geom_line( aes(x=eta,y=value,col=parameter) ) +
-    labs(y="MSE theta")
-  print(p)
-  
 }
 
 # Illustrate convenience of SMI in expectation #
@@ -141,40 +142,42 @@ if(T) {
   
   
   # Plot posterior vs true value
-  aistats2020smi::set_ggtheme()
-  post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
-    
-    p = data.frame( eta=eta_all,
-                    post_mean=post_eta_all_average[[1]][,par_i],
-                    post_sd=post_eta_all_average[[2]][,par_i]^0.5 ) %>%
-      ggplot() + 
-      geom_line( aes(x=eta,y=post_mean), col='red' ) +
-      geom_line( aes(x=eta,y=post_mean+post_sd), col='blue', lty=3 ) +
-      geom_line( aes(x=eta,y=post_mean-post_sd), col='blue', lty=3 ) +
-      geom_hline(yintercept=param_true[par_i], lty=2) +
-      labs(y=paste(param_names[par_i]," posterior",sep=""))
-    p
+  if(F){
+    aistats2020smi::set_ggtheme()
+    post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
+      
+      p = data.frame( eta=eta_all,
+                      post_mean=post_eta_all_average[[1]][,par_i],
+                      post_sd=post_eta_all_average[[2]][,par_i]^0.5 ) %>%
+        ggplot() + 
+        geom_line( aes(x=eta,y=post_mean), col='red' ) +
+        geom_line( aes(x=eta,y=post_mean+post_sd), col='blue', lty=3 ) +
+        geom_line( aes(x=eta,y=post_mean-post_sd), col='blue', lty=3 ) +
+        geom_hline(yintercept=param_true[par_i], lty=2) +
+        labs(y=paste(param_names[par_i]," posterior",sep=""))
+      p
+    }
+    p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
+    # print(p)
   }
-  p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
-  # print(p)
   
   # Plot MSE
   aistats2020smi::set_ggtheme()
   mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
-    # par_i=3
+    # par_i=1
     p = data.frame( eta=eta_all,
                     mse=MSE_average[,par_i] ) %>%
       ggplot() + 
       geom_line( aes(x=eta,y=mse), col='red' ) +
-      labs(y=paste(param_names[par_i]," MSE",sep=""))
+      labs(y=paste("MSE( ",param_names[par_i]," )",sep=""))
     p
   }
-  p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
+  # p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], mse_plot_all[[3]], ncol=1, align='v' )
   # print(p)
   
   # Compare theta vs theta_tilde
   aistats2020smi::set_ggtheme()
-  p = MSE_average %>%
+  p_mse_theta = MSE_average %>%
     `colnames<-`(param_names) %>%
     as.data.frame() %>%
     mutate(eta=eta_all) %>%
@@ -183,8 +186,8 @@ if(T) {
     ggplot() +
     geom_line( aes(x=eta,y=value,col=parameter) ) +
     labs(y="MSE average theta")
-  # print(p)
-
+  # print(p_mse_theta)
+  p = cowplot::plot_grid(  mse_plot_all[[1]], p_mse_theta, ncol=1, align='v' )
   
   # ELPD approximation via Monte Carlo
   set.seed(123)

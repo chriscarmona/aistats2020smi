@@ -1,3 +1,5 @@
+AISTATS_2020_SMI_supplement-concordance.tex
+AISTATS_2020_SMI_supplement.tex
 *.aux
 *.bbl
 *.blg
@@ -19,3 +21,4 @@
 *.synctex(busy)
 *.tdo
 *.toc
+.build.timestamp

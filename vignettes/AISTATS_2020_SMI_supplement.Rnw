@@ -87,7 +87,8 @@ p(Y  \mid  \varphi)_{\theta} &= \frac{1}{p(\varphi)} \; p(Y , \varphi)_{\theta}\
 \end{align*}
 
 All the figures and numerical results presented in the main text and this supplementcan be replicated using our R package, \texttt{aistats2020smi}, available in Github.
-<<load_aistats2020smi, eval=TRUE, echo=FALSE>>=
+<<load_aistats2020smi, eval=TRUE, echo=TRUE>>=
+# devtools::install_github("christianu7/aistats2020smi")
 library(aistats2020smi)
 @
 
@@ -151,7 +152,7 @@ Note the relation between the cut posterior and the conventional posterior
 
 The \textbf{$\eta$-smi posterior} is defined as
 \begin{align} \label{eq:smi_post}
- p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) \; p(\theta \mid Y,\varphi) \nonumber \\
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) \; p(\theta \mid Y,\varphi) \nonumber \\
  &= \frac{ p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) }{ p(Z, Y)_{\tilde\theta}} \frac{ p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) }{ p( Y , \varphi)_{\theta} } \nonumber \\
  &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
  &\propto p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \nonumber
@@ -159,8 +160,8 @@ The \textbf{$\eta$-smi posterior} is defined as
 
 In the penultimate step, we assume that $\theta$ and $\tilde\theta$ are conditionally independent given $\varphi$ in the prior, so $ p(\varphi, \theta, \tilde\theta) = p(\theta \mid \varphi) p(\tilde\theta\mid \varphi) p(\varphi)= p( \varphi, \theta ) \; p( \varphi, \tilde\theta ) \frac{1}{p(\varphi)} $.
 
-From here is easy to see two particular cases of the $\eta$-smi posterior: the cut model $p_{\eta-smi}(\varphi,\theta \mid Z,Y) = p_{cut}(\varphi,\theta \mid Z,Y)$ when $\eta=0$; and the conventional posterior
- $p_{\eta-smi}(\varphi,\theta \mid Z,Y) = p(\varphi,\theta \mid Z,Y)$ when $\eta=1$.
+From here is easy to see two particular cases of the $\eta$-smi posterior: the cut model $p_{smi,\eta}(\varphi,\theta \mid Z,Y) = p_{cut}(\varphi,\theta \mid Z,Y)$ when $\eta=0$; and the conventional posterior
+ $p_{smi,\eta}(\varphi,\theta \mid Z,Y) = p(\varphi,\theta \mid Z,Y)$ when $\eta=1$.
 
 \section{Analysis with (Semi-)Modular Inference} \label{sec:smi_considerations}
 
@@ -184,7 +185,7 @@ They show that an optimal, valid and coherent update of beliefs is of the form
 
 The flexibility of the framework stablished by \cite{Bissiri2016} allows us to analyse the SMI posterior and the cut model posterior as alternative updates of beliefs. From Eq.~\ref{eq:smi_post} we can see that the loss function underlying the SMI posterior is
 \begin{equation} \label{eq:smi_loss}
-  l_{\eta-smi}( (\varphi,\theta,\tilde\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) - \eta \log p(Y \mid \varphi,\tilde\theta) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi) .
+  l_{smi,\eta}( (\varphi,\theta,\tilde\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) - \eta \log p(Y \mid \varphi,\tilde\theta) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi) .
 \end{equation}
 Similarly, from Eq.~\ref{eq:cut_post} we can see that the loss function for the cut model is
 \begin{equation} \label{eq:cut_loss}
@@ -199,14 +200,14 @@ The SMI posterior in Eq.~\ref{eq:smi_post} updates the belief distribution by ob
 
 Say our current distribution of beliefs about $(\varphi,\theta, \tilde\theta)$ is $p(\varphi,\theta, \tilde\theta)$. Our updated belief by observing \textit{only} $Z$ would be
 \begin{align} \label{eq:smi_post_z}
- p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Z ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Z ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
  &= p(Z \mid \varphi) \; \frac{1}{ p(Z ) } p(\varphi, \theta, \tilde\theta) \\
  &= p(Z \mid \varphi) \frac{ 1 }{ \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) \nonumber
 \end{align}
 
 similarly, if we observe \textit{only} $Y$ our updated beliefs are
 \begin{align} \label{eq:smi_post_y}
- p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Y) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Y ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Y) &= \psi\{ l( (\varphi,\theta,\tilde\theta); Y ) , p( \varphi, \theta,\tilde\theta) \} \nonumber \\
  &= p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p( Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
  &= p( Y \mid \varphi, \tilde \theta )^\eta \; p( Y \mid \varphi,  \theta ) \frac{ 1 }{ \int \int p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta} \frac{ p(\varphi) }{ \int  p( Y \mid \varphi,  \theta ) \; p(\varphi, \theta ) \;  d\theta} p(\varphi, \theta, \tilde\theta) \nonumber
 \end{align}
@@ -216,7 +217,7 @@ similarly, if we observe \textit{only} $Y$ our updated beliefs are
 First, we show that the update from prior to posterior, is equivalent to updating sequentially first $Z$ and then $Y$. This is (a)=(b)+(c) in the following diagram:
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(b)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z) \ar[r,"(c)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z,Y)
+p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(b)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z) \ar[r,"(c)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z,Y)
 \end{tikzcd}
 
 The update (a) is given by Equation~\ref{eq:smi_post}.
@@ -233,7 +234,7 @@ The update (b)+(c) is equivalent to Eq.~\ref{eq:smi_post_y} substituting the cur
  &\propto p(Z \mid \varphi) p( Y \mid \varphi, \tilde \theta )^\eta p( Y \mid \varphi,  \theta ) \frac{ 1 }{ P(Y \mid \varphi )_{\theta} } p(\varphi, \theta, \tilde\theta).
 \end{align*}
 
-The equivalence $p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is clear by comparing the last formula with smi posterior in Eq.~\ref{eq:smi_post}. For the last line, we used the following identity
+The equivalence $p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is clear by comparing the last formula with smi posterior in Eq.~\ref{eq:smi_post}. For the last line, we used the following identity
 \begin{align*}
  \frac{ p_{(b)}(\varphi \mid Z) }{ \int  p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta \mid Z ) \;  d\theta } &=\frac{ \int \int p_{(b)}(\varphi, \theta, \tilde\theta\mid Z) d\theta d\tilde\theta }{ \int  \int p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta, \tilde\theta\mid Z ) \;  d\theta d\tilde\theta } \\
  &= \frac{ \int \int p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) d\theta d\tilde\theta}{ \int \int p( Y \mid \varphi,  \theta ) \; p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta) \;  d\theta d\tilde\theta } \\
@@ -244,7 +245,7 @@ The equivalence $p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{\eta-smi}
 Now, we want a similar result by first observing $Y$ and then $Z$, i.e. (a)=(d)+(e) in the following diagram
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(d)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y) \ar[r,"(e)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z,Y)
+p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(d)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y) \ar[r,"(e)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z,Y)
 \end{tikzcd}
 
 The update (a) is again given by Equation~\ref{eq:smi_post}.
@@ -259,7 +260,7 @@ The update (d)+(e) is equivalent to Eq.~\ref{eq:smi_post_z} substituting the cur
  p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y) &\propto p( Z \mid \varphi) \; p_{(d)}(\varphi, \theta, \tilde\theta \mid Y ) \\
  &= p( Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \; p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta).
 \end{align*}
-The equivalence $p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is direct from comparing the last formula with Eq.~\ref{eq:smi_post}.
+The equivalence $p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is direct from comparing the last formula with Eq.~\ref{eq:smi_post}.
 
 \subsubsection{Coherence under data partition from the same module}
 
@@ -267,7 +268,7 @@ Now we verify that the smi posterior is coherent when observing a sequential por
 
 First, we verify coherence for the partition of data $Z$. We want to check (b)=(b1)+(b2) in the following diagram.
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(b)", bend left=10] \ar[r,"(b1)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z_1) \ar[r,"(b2)", swap] & p_{\eta-smi}(\varphi,\theta \mid Z)
+p(\varphi,\theta) \ar[rr,"(b)", bend left=10] \ar[r,"(b1)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z_1) \ar[r,"(b2)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z)
 \end{tikzcd}
 
 Update (b) is the same as defined above in Equation~\ref{eq:smi_update_b}
@@ -284,7 +285,7 @@ clearly $p_{(b1)+(b2)}(\varphi,\theta,\tilde\theta \mid Z_1,Z_2)=p_{(b)}(\varphi
 Lastly, we verify coherence for the partition of data $Y$. We want to check (d)=(d1)+(d2) in the following diagram.
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(d)", bend left=10] \ar[r,"(d1)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y_1) \ar[r,"(d2)", swap] & p_{\eta-smi}(\varphi,\theta \mid Y)
+p(\varphi,\theta) \ar[rr,"(d)", bend left=10] \ar[r,"(d1)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y_1) \ar[r,"(d2)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y)
 \end{tikzcd}
 
 Update (d) is the same as defined above in Equation~\ref{eq:smi_update_d}
@@ -335,11 +336,11 @@ From here we see that the $\eta$-smi posterior in Eq.~\ref{eq:smi_post} satisfie
 \ref{eq:smi_kernel}
 
 \begin{align*}
-p_{\eta-smi}&(\varphi,\theta,\tilde\theta \mid Z,Y) K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta) \\
+p_{smi,\eta}&(\varphi,\theta,\tilde\theta \mid Z,Y) K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta) \\
 &= [ p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y)p(\theta \mid Y,\varphi) ][ K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) p(\theta' \mid Y,\varphi') ] \\
 &= p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y) p(\theta \mid Y,\varphi) \frac{p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')}{p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y)} p(\theta' \mid Y,\varphi')\\
 &= p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) p(\theta' \mid Y,\varphi') K(\varphi,\tilde\theta \mid \varphi',\tilde\theta') p(\theta \mid Y,\varphi)\\
-&=p_{\eta-smi}(\varphi',\theta',\tilde\theta' \mid Z,Y) K(\varphi,\theta,\tilde\theta \mid \varphi',\theta',\tilde\theta')
+&=p_{smi,\eta}(\varphi',\theta',\tilde\theta' \mid Z,Y) K(\varphi,\theta,\tilde\theta \mid \varphi',\theta',\tilde\theta')
 \end{align*}
 
 
@@ -349,7 +350,7 @@ Our baseline is standard Bayes-MCMC on the original full model.
 Let $\tau_{\phi,\theta}$ be the Integrated Autocorrelation Time (IACT) of Bayes-MCMC. If the Effective Sample Size (ESS) is $N$ then we have $T=N\tau_{\phi,\theta}$ MCMC steps. If one Bayes-MCMC step has unit cost then the overall cost is $W_{BM}=T$[time]. This doesn't parallelise.
 
 The SMI posterior is \[
-p_{\eta-smi}(\phi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\phi,\tilde\theta|Y,Z)p(\theta|Y,\phi).
+p_{smi,\eta}(\phi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\phi,\tilde\theta|Y,Z)p(\theta|Y,\phi).
 \]
 If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\phi,\tilde\theta|Y,Z)$ then the work sampling $(\phi,\tilde\theta)$ is $W_{Bayes}$. Thin the $\phi$ samples every $\tau_{\phi,\theta}$ steps to get
 an ESS about $N$ (rough but reasonable).
@@ -408,7 +409,7 @@ First, derive $p(Y \mid \varphi)_{\theta}$ as a function of $\varphi$
 
 Now we can obtain the $\eta$-smi posterior
 \begin{align*}
- p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
  &\propto \exp\{ -\frac{1}{2} \; [ \varphi^2 ( \frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) + \frac{1}{\sigma_\varphi^2} - \frac{m}{\sigma_y^2 + m \sigma_\theta^2} ) - 2 \varphi (\frac{n}{\sigma_z^2} + \frac{m}{\sigma_y^2}(1+\eta) - \bar Y \frac{m}{ \sigma_y^2 + m \sigma_\theta^2}) + \\
  & \hspace{2cm} \theta^2 (\frac{m}{\sigma_y^2} + \frac{1}{\sigma_\theta^2}) - 2 \theta (\bar Y \frac{m}{\sigma_y^2 }) + \\
  & \hspace{2cm} \tilde\theta^2 ( \eta \frac{m}{\sigma_y^2} + \frac{1}{\tilde\sigma_\theta^2}) - 2 \tilde\theta (\eta \bar Y \frac{m}{\sigma_y^2 }) + \\
@@ -417,7 +418,7 @@ Now we can obtain the $\eta$-smi posterior
 
 From here we see that the joint posterior distribution for $(\varphi,\theta,\tilde\theta)$ is a multivariate normal distribution defined as:
 \begin{equation} \label{eq:smi_post_5_1}
-p_{\eta-smi}(\varphi,\theta,\tilde\theta \mid Z, Y ) = \text{Normal}( \mu, \Sigma ),
+p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y ) = \text{Normal}( \mu, \Sigma ),
 \end{equation}
 
 with
@@ -433,8 +434,281 @@ with
 \end{bmatrix}.
 \end{equation*}
 
-<<biased_data_01, eval=TRUE, echo=FALSE>>=
+The generative parameters described in the main text are as follows
+<<biased_data_01, eval=TRUE, echo=TRUE>>=
+n=25 # Sample size for Z
+m=50 # Sample size for Y
+
+phi = 0 
+theta = 1 # bias
+
+sigma_z = 2 # variance for Z
+sigma_y = 1 # variance for Y
 @
+
+The true bias is $\theta=1$. Assume we have an over-optimistic view of the bias, with prior distribution centered in 0 and relatively small prior variance.
+<<biased_data_02, eval=TRUE, echo=FALSE>>=
+sigma_phi=Inf # Prior variance for phi
+sigma_theta=0.5 # Prior variance for eta
+@
+
+<<biased_data_03, eval=TRUE, echo=FALSE>>=
+param_names = c('phi','theta','theta_tilde')
+param_true = c(phi,theta,theta)
+
+# sequence of eta values in (0,1)
+eta_all = seq(0,1,0.01)
+@
+
+<<biased_data_04, eval=TRUE, echo=FALSE>>=
+set.seed(123)
+Z = rnorm( n=n, mean=phi, sd=sigma_z)
+Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
+# cat('Z_mean=',mean(Z),'; Y_mean=',mean(Y))
+
+post_eta_all = foreach::foreach(eta = eta_all,.combine='lrcomb', .multicombine=TRUE) %dopar% {
+  # eta = 0.01
+  # Compute posterior mean and variance
+  posterior = aistats2020smi::SMI_post_biased_data( Z=Z, Y=Y, sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta )
+  list( t(posterior[[1]]), diag(posterior[[2]]) )
+}
+# Compute MSE
+mse_eta_all = post_eta_all[[2]] + ( post_eta_all[[1]] - t( matrix(param_true,3,length(eta_all)) ) )^2
+
+# Plot posterior vs true value
+aistats2020smi::set_ggtheme()
+post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
+  
+  p = data.frame( eta=eta_all,
+                  post_mean=post_eta_all[[1]][,par_i],
+                  post_sd=post_eta_all[[2]][,par_i]^0.5 ) %>%
+    ggplot() + 
+    geom_line( aes(x=eta,y=post_mean), col='red' ) +
+    geom_line( aes(x=eta,y=post_mean+post_sd), col='blue', lty=3 ) +
+    geom_line( aes(x=eta,y=post_mean-post_sd), col='blue', lty=3 ) +
+    geom_hline(yintercept=param_true[par_i], lty=2) +
+    labs(y=paste(param_names[par_i]," posterior",sep=""))
+  p
+}
+p = cowplot::plot_grid(  post_plot_all[[1]], post_plot_all[[2]], post_plot_all[[3]], ncol=1, align='v' )
+ggsave( plot=p,
+          filename="SMI_biased_posterior_single_dataset.pdf",
+          device="pdf", width=10,height=15, units="cm")
+@
+
+In Figure~\ref{fig:smi_post_5_1} we show posterior distributions (mean $\pm$ std. dev.) for a randomly generated dataset ($\bar Z=$\Sexpr{round(mean(Z),4)}; $\bar Y=$\Sexpr{round(mean(Y),4)}) using the generative parameters described in the main text. Note that the conventional bayes ($\eta=1$) is the worst estimation for the true parameters $\varphi$ accross all posible candidates $\eta \in [0,1]$.
+<<biased_data_05, eval=TRUE, echo=TRUE>>=
+# Posterior for conventional bayes eta=1
+posterior = SMI_post_biased_data( Z=Z, Y=Y,
+                                  sigma_z=sigma_z, sigma_y=sigma_y,
+                                  sigma_phi=sigma_phi,
+                                  sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta,
+                                  eta=1 )
+# posterior mean
+setNames( c(posterior[[1]]), param_names )
+@
+
+\begin{figure}[!ht]
+\center
+\includegraphics[width=0.5\textwidth]{SMI_biased_posterior_single_dataset}
+\caption{Posterior distribution of $\varphi$, $\theta$ and $\tilde\theta$. A black horizontal line shows the true generative value. Mean (solid red line) $\pm$ one std. dev. (dotted blue line) }
+  \label{fig:smi_post_5_1}
+\end{figure}
+
+\subsubsection{Mean Square Error (MSE)}
+
+From Equation~\ref{eq:smi_post}, we can compute the MSE of estimates arising from the SMI posterior $\varphi$, $\theta$ and , $\tilde\theta$,
+\begin{align*}
+  MSE(\varphi) &= \Sigma_{[1,1]} + (\mu_{[1]}-\varphi^*)^2\\
+  MSE(\theta) &= \Sigma_{[2,2]} + (\mu_{[2]}-\theta^*)^2\\
+  MSE(\tilde\theta) &= \Sigma_{[3,3]} + (\mu_{[3]}-\theta^*)^2
+\end{align*}
+
+In the first simulation study of the main text we display $MSE(\varphi)$ and $MSE(\theta)$ to demonstrate that we can reach smaller MSE with values of $\eta$ other than 0 and 1. To generate this plots, we produced 1000 synthetic datasets, computed MSE using Eq.~\ref{eq:smi_post} on each one, with a grid of values of $\eta\in[0,1]$. The MSE lines displayed correspond to the \textit{average} MSE across datasets, for each value of $\eta$.
+
+<<biased_data_06, eval=TRUE, echo=FALSE>>=
+set.seed(123)
+  
+# Average Mean Square Error #
+
+# Compute Posterior mean and sd for each iteration
+n_iter = 1000
+Z = matrix(rnorm( n=n*n_iter, mean=phi, sd=sigma_z),n_iter,n)
+Y = matrix(rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y ),n_iter,m)
+post_eta_all_iter = foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %:%
+  foreach(eta_i = seq_along(eta_all), .combine='lrcomb', .multicombine=TRUE) %dopar% {
+    # eta_i=1
+    posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    list( t(posterior[[1]]), diag(posterior[[2]]) )
+}
+# Compute MSE for each iteration
+param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
+MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[1]]-param_true_array)^2
+
+# Average across iterations
+post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
+                             apply(post_eta_all_iter[[2]],c(1,2),mean) + apply(post_eta_all_iter[[1]],c(1,2),var))
+MSE_average = apply(MSE_all_iter,c(1,2),mean)
+
+# Plot MSE
+aistats2020smi::set_ggtheme()
+mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
+  # par_i=1
+  p = data.frame( eta=eta_all,
+                  mse=MSE_average[,par_i] ) %>%
+    ggplot() + 
+    geom_line( aes(x=eta,y=mse), col='red' ) +
+    labs(y=paste("MSE( ",param_names[par_i]," )",sep=""))
+  p
+}
+p = cowplot::plot_grid(  mse_plot_all[[1]], mse_plot_all[[2]], ncol=1, align='v' )
+ggsave( plot=p,
+        filename="SMI_biased_MSE_average.pdf",
+        device="pdf", width=10,height=10, units="cm")
+
+# MSE theta vs theta_tilde
+aistats2020smi::set_ggtheme()
+p = MSE_average %>%
+  `colnames<-`(param_names) %>%
+  as.data.frame() %>%
+  mutate(eta=eta_all) %>%
+  tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
+  dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
+  ggplot() +
+  geom_line( aes(x=eta,y=value,col=parameter) ) +
+  coord_cartesian(ylim=c(0.28,0.50)) +
+  labs(y="MSE( theta )")
+ggsave( plot=p,
+        filename="SMI_biased_MSE_average_theta.pdf",
+        device="pdf", width=10,height=10, units="cm")
+@
+
+\begin{figure}[!ht]
+  \center
+  \includegraphics[width=0.5\textwidth]{SMI_biased_MSE_average.pdf}
+  \caption{Mean Squared Error of the two main parameters under SMI posterior.}
+  \label{fig:SMI_biased_MSE_average}
+\end{figure}
+
+Here we also show a comparison between $\theta$ and $\tilde\theta$. Figure~\ref{fig:SMI_biased_MSE_average} shows that $\tilde\theta$ is dominated by $\theta$ in MSE. The comparison emphasize the convenience of SMI over power likelihood discussed in section 4.4 of the main text.
+
+\begin{figure}[!ht]
+  \center
+  \includegraphics[width=0.5\textwidth]{SMI_biased_MSE_average_theta.pdf}
+  \caption{Comparison of the bias estimation under SMI (theta) vs powered likelihood (theta tilde)}
+  \label{fig:SMI_biased_MSE_average_theta}
+\end{figure}
+
+\subsubsection{Expected log pointwise predictive density (elpd)}
+
+The simplicity and conjugacy of this model allow us to derive exact formula for the elpd
+\begin{equation*}
+  elpd = \int\int p^*(z,y) \log p_{smi,\eta}( z, y \mid Z,Y) dz dy
+\end{equation*}
+where $p^*$ is the distribution representing the true data-generating process and
+\begin{equation*}
+  p_{smi,\eta}(z,y \mid Z,Y)=\int\int p(z,y \mid \varphi, \theta) \; p_{smi,\eta}(\varphi,\theta \mid Y,Z)\, d\varphi\,d\theta
+\end{equation*}
+is a candidate posterior predictive distribution, indexed by $\eta$.
+
+Let $\begin{bmatrix}  a & b \\ b & c \end{bmatrix}=Cov(\varphi,\theta \mid Z,Y)^{-1}$ be the  inverse of the posterior covariance matrix of $(\varphi,\theta)$, and $\begin{bmatrix}  d \\ e \end{bmatrix}=E(\varphi,\theta \mid Z,Y)$ the posterior means.
+
+Following straightforward Gaussian completion we can show that the joint posterior distribution for $\varphi$, $\theta$, and new data $z_0$ and $y_0$ is:
+\begin{align*}
+  p_{smi,\eta}(z_0,y_0,\varphi,\theta|Z,Y) &\propto p(z_0,y_0|\varphi,\theta) \; p_{smi,\eta}(\varphi,\theta|Z,Y) \\
+  &\propto \exp\{ -\frac{1}{2} \; [ z_0^2 (\frac{1}{\sigma_z^2}) + y_0^2 (\frac{1}{\sigma_y^2}) + \varphi^2 (a+\frac{1}{\sigma_z^2}+\frac{1}{\sigma_y^2}) + \theta^2 (c + \frac{1}{\sigma_y^2} ) + \\
+  & \hspace{2cm} - 2 z_0 \varphi (\frac{1}{\sigma_z^2}) - 2 y_0 \varphi (\frac{1}{\sigma_y^2}) - 2 y_0 \theta (\frac{1}{\sigma_y^2}) + 2 \varphi \theta (b+\frac{1}{\sigma_y^2}) \\
+  & \hspace{2cm} -2 \varphi (a d + b e) -2 \theta (b d + c e ) ] \}
+\end{align*}
+
+So we have
+\begin{equation} \label{eq:smi_post_pred_5_1}
+p_{smi,\eta}(z_0,y_0,\varphi,\theta \mid Z, Y ) = \text{Normal}( \mu, \Sigma ),
+\end{equation}
+
+with
+\begin{equation*}
+  \Sigma = \begin{bmatrix}
+  \frac{1}{\sigma_z^2} & 0 & -\frac{1}{\sigma_z^2} & 0 \\
+  0 & \frac{1}{\sigma_y^2} & -\frac{1}{\sigma_y^2} & -\frac{1}{\sigma_y^2} \\
+  -\frac{1}{\sigma_z^2} & -\frac{1}{\sigma_y^2} & a+\frac{1}{\sigma_z^2}+\frac{1}{\sigma_y^2} & b+\frac{1}{\sigma_y^2} \\
+  0 & -\frac{1}{\sigma_y^2} & b+\frac{1}{\sigma_y^2} & c + \frac{1}{\sigma_y^2}
+\end{bmatrix}^{-1} \text{, and } \mu = \Sigma \begin{bmatrix}
+  0 \\
+  0 \\
+  a d + b e \\
+  b d + c e
+\end{bmatrix}.
+\end{equation*}
+
+We know the true generative values $\varphi^*$ and $\theta^*$, so we can compute $elpd$ using Monte Carlo samples from the true generative distribution $p^*$ and evaluate this values in the log-density of the bivariate normal $(z_0,y_0|Z,Y)$ from Equation~\ref{eq:smi_post_pred_5_1}.
+
+<<biased_data_07, eval=TRUE, echo=FALSE>>=
+# ELPD approximation via Monte Carlo
+set.seed(0)
+n_new = 1000
+
+# generate data from the ground-truth distribution
+Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
+Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
+
+log_pred_eta_all_iter = foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
+  foreach( eta_i = seq_along(eta_all), .combine=rbind ) %dopar% {
+    # iter_i=1
+    # new_i = 1
+    # eta_i=1
+    # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    mvtnorm::dmvnorm( x=cbind(Z_new[iter_i,],Y_new[iter_i,]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
+}
+# average to get elpd
+elpd_eta_all = apply(log_pred_eta_all_iter,1,mean)
+
+# Plot ELPD
+aistats2020smi::set_ggtheme()
+p = data.frame(eta=eta_all, elpd=elpd_eta_all) %>%
+  ggplot() +
+  geom_line( aes(x=eta,y=-elpd),col='red' ) +
+  labs(y="- elpd(z,y)")
+ggsave( plot=p,
+          filename="SMI_biased_elpd.pdf",
+          device="pdf", width=10,height=7, units="cm")
+@
+
+In Figure~\ref{fig:SMI_biased_elpd} we show the Monte Carlo estimation of the $elpd$. We select the optimal $\eta$ as the value that maximise the $elpd$. To generate this plot, we produced 1000 synthetic datasets, computed $elpd$ on each one (using Monte Carlo), with a grid of values of $\eta\in[0,1]$. The $elpd$ line correspond to the \textit{average} elpd across datasets, for each value of $\eta$.
+
+\begin{figure}[!ht]
+  \center
+  \includegraphics[width=0.5\textwidth]{SMI_biased_elpd.pdf}
+  \caption{ELPD under SMI posterior.}
+  \label{fig:SMI_biased_elpd}
+\end{figure}
+
+\subsection{Experiments on Bayesian Multiple Imputation}\label{sec:bayes_impute}
+
+Bla
+
+\subsection{Agricultural practices in early civilizations} \label{sec:agric_analysis}
+
+The aim of the study, described in detail in \cite{Styring2017}, is to provide statistical evidence about a specific agricultural practice of the first urban centres in northern Mesopotamia.
+
+The hypothesis is that increased agricultural production to support growing urban populations was achieved by cultivation of larger areas of land, entailing lower manure/midden inputs per unit area. This practice is known as \emph{extensification}.
+
+Our contribution goes into extending the methods used to perform Bayesian analysis in this adverse scenario of model misspecification and big missing data.
+
+\subsubsection{ Data }
+
+The data consists of measurements of nitrogen and carbon isotopes for a collection of crop remains. There are two datasets: archaeological and calibration, which we will denote by $\mathcal{M}$ and $\mathcal{C}$, respectively. First, the \emph{Archaeological} dataset $\mathcal{M}$, consists of data gathered from excavations of antique crop sites in the region of Mesopotamia. Second, the \emph{Calibration} dataset, $\mathcal{C}$, which was gathered in a controlled experimental setting in recent years. Further characteristics and description of variables on each dataset can be found in the statistical supplement to \cite{Styring2017}.
+
+\subsubsection{ The model } \label{sec:agric_model}
+
+We preserved the model stated in \cite{Styring2017}. The main goal of this study is to is to provide statistical evidence for the hypothesis of \emph{extensification} in the ancient urban sites. This hypothesis can be condensed in analysing the strength of the effect of the site size $S_i$ on the corresponding manure level $M_i$ for the records in the archaeological data, $\{i \in \mathcal{M}\}$. The more negative the estimated effect, the stronger the evidence is supporting the extensification hypothesis.
+
+However, there is no available information about the Manuring levels in the ancient dataset. This is addressed by using a \emph{Data augmentation} perspective, and consider that all the corresponding values of the manure level in the Archaeological data are missing. We will denote this values as denote these unobserved manure levels as $M_{\mathcal{M}}=\{M_i; i \in \mathcal{M}\}$.
+
+The model consists of a two-module model, which integrates archaeological and calibration data so the missing manuring levels can be inferred. The first module is a Proportional Odds model for the missing Manure Levels ($M_{\mathcal{M}}$) in the archaeological data. The second module consists of a linear Gaussian model for the Nitrogen level of the crops ($Z$), which is applicable to both datasets.
+
+ The setting here is similar to the experiment in Section~\ref{sec:exp_1} above, but incorporating more covariates into both modules ($S$: size of crop field; $P$: indicator of historical context; $R$: rainfall level; $C$ category of crop species). Figure~\ref{fig:graph_model} depicts the graphical representation of the model.
 
 
 \bibliographystyle{apalike} %use the apalike bibliography style
