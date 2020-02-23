@@ -3,7 +3,7 @@
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
 
 % Recommended, but optional, packages for figures and better typesetting:
-\usepackage{microtype}      % microtypography
+% \usepackage{microtype}      % microtypography
 % \usepackage{subfigure}
 \usepackage{booktabs}       % professional-quality tables
 % \usepackage{nicefrac}       % compact symbols for 1/2, etc.
@@ -20,7 +20,7 @@
 
 \usepackage{afterpage}
 \usepackage{graphicx}
-%\graphicspath{{img/}} % define folder with images
+\graphicspath{{img/}} % define folder with images
 
 
 %\usepackage[ruled, lined, longend, linesnumbered]{algorithm2e}
@@ -50,11 +50,14 @@
 \usepackage{tikz}
 \usetikzlibrary{cd} %for commutative diagrams
 \usetikzlibrary{backgrounds}
+
 % For graphical models
 \usetikzlibrary{fit,positioning,arrows.meta,bayesnet,shapes.geometric,chains,matrix,scopes,calc,decorations.markings}
-   \tikzstyle{param}=[circle, minimum size = 1cm, thick, draw=black!100, fill = gray!10, node distance = 1cm]
-   \tikzstyle{data}=[rectangle, minimum size = 1cm, thick, draw =black!100, node distance = 1cm]
-   \tikzstyle{model}=[rectangle, minimum size = 2cm, rounded corners, thick, draw =black!50, node distance = 0.75cm]
+
+\tikzstyle{param}=[circle, minimum size = 0.7cm, thick, draw=black!100, fill = gray!10, node distance = 0.5cm]
+\tikzstyle{data}=[rectangle, minimum size = 0.7cm, thick, draw =black!100, node distance = 0.5cm]
+\tikzstyle{model}=[rectangle, minimum size = 1cm, thick, draw=black!100, node distance = 0.5cm]
+
 
 % \usepackage[round]{natbib} % richer citation
 \usepackage{natbib} % richer citation

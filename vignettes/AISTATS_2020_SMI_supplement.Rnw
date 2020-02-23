@@ -97,7 +97,7 @@ library(aistats2020smi)
 \section{Background methods}\label{sec:background}
 
 % Geoff comments on misspecification
-What is model misspecification? Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. This is defined in more detail in Section~\ref{sec:opt_eta}. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
+What is model misspecification? Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
 
 \subsection{Explicit formulae for cut posterior}
 
@@ -105,18 +105,19 @@ Recall the graphical analysed in the main text
 \begin{figure}[!ht]
 \begin{center}
 \begin{tikzpicture}
+    % Nodes
     \node (Z) [data] {$Z$};
-    \node (Y) [data, right=of Z] {$Y$};
+    \node (Y) [data, right=of Z, xshift=0.5cm] {$Y$};
     \node (phi) [param, below=of Z] {$\varphi$};
     \node (theta) [param, below=of Y] {$\theta$};
-
-    \draw[dashed,red,line width=0.5mm] (1,0) -- (1,-2);
-
+    % Edges
     \edge {phi} {Z,Y};
     \edge {theta} {Y};
-
-    \node[text width=3cm] at (0,1.2) {Module 1};
-    \node[text width=3cm] at (3.5,1.2) {Module 2};
+    % SMI line
+    \draw[dashed,red,line width=0.5mm] (0.85,0) to (0.85,-1.25);
+    % Text denoting modules
+    \node[text width=3cm] at (0.5,1) {Module 1};
+    \node[text width=3cm] at (2.75,1) {Module 2};
 \end{tikzpicture}
 \end{center}
 \caption{Graphical representation of a simple multi-modular model.}
@@ -371,7 +372,7 @@ Finally, we compute and smooth the WAIC across the $J$ runs. This part is fast o
 
 \section{Data Analyses} \label{sec:data_analyses}
 
-\subsection{Simulation study 1: Biased data}
+\subsection{Simulation study: Biased data} \label{sec:biased_data}
 
 \begin{multicols}{2}
 Model:
@@ -450,9 +451,7 @@ The true bias is $\theta=1$. Assume we have an over-optimistic view of the bias,
 <<biased_data_02, eval=TRUE, echo=FALSE>>=
 sigma_phi=Inf # Prior variance for phi
 sigma_theta=0.5 # Prior variance for eta
-@
 
-<<biased_data_03, eval=TRUE, echo=FALSE>>=
 param_names = c('phi','theta','theta_tilde')
 param_true = c(phi,theta,theta)
 
@@ -460,7 +459,7 @@ param_true = c(phi,theta,theta)
 eta_all = seq(0,1,0.01)
 @
 
-<<biased_data_04, eval=TRUE, echo=FALSE>>=
+<<biased_data_03, eval=TRUE, echo=FALSE>>=
 set.seed(123)
 Z = rnorm( n=n, mean=phi, sd=sigma_z)
 Y = rnorm( n=m, mean=phi+theta, sd=sigma_y )
@@ -497,14 +496,14 @@ ggsave( plot=p,
 @
 
 In Figure~\ref{fig:smi_post_5_1} we show posterior distributions (mean $\pm$ std. dev.) for a randomly generated dataset ($\bar Z=$\Sexpr{round(mean(Z),4)}; $\bar Y=$\Sexpr{round(mean(Y),4)}) using the generative parameters described in the main text. Note that the conventional bayes ($\eta=1$) is the worst estimation for the true parameters $\varphi$ accross all posible candidates $\eta \in [0,1]$.
-<<biased_data_05, eval=TRUE, echo=TRUE>>=
+<<biased_data_04, eval=TRUE, echo=TRUE>>=
 # Posterior for conventional bayes eta=1
 posterior = SMI_post_biased_data( Z=Z, Y=Y,
                                   sigma_z=sigma_z, sigma_y=sigma_y,
                                   sigma_phi=sigma_phi,
                                   sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta,
                                   eta=1 )
-posterior = mapply('rownames<-', posterior, MoreArgs=list(value=param_names), SIMPLIFY=FALSE)
+posterior = mapply('rownames<-', posterior, MoreArgs=list(value=param_names))
 # posterior mean
 posterior$mean
 @
@@ -527,13 +526,13 @@ From Equation~\ref{eq:smi_post}, we can compute the MSE of estimates arising fro
 
 In the first simulation study of the main text we display $MSE(\varphi)$ and $MSE(\theta)$ to demonstrate that we can reach smaller MSE with values of $\eta$ other than 0 and 1. To generate this plots, we produced 1000 synthetic datasets, computed MSE using Eq.~\ref{eq:smi_post} on each one, with a grid of values of $\eta\in[0,1]$. The MSE lines displayed correspond to the \textit{average} MSE across datasets, for each value of $\eta$.
 
-<<biased_data_06, eval=TRUE, echo=FALSE>>=
+<<biased_data_05, eval=TRUE, echo=FALSE>>=
 set.seed(123)
   
 # Average Mean Square Error #
 
 # Compute Posterior mean and sd for each iteration
-n_iter = 1000
+n_iter = 10
 Z = matrix(rnorm( n=n*n_iter, mean=phi, sd=sigma_z),n_iter,n)
 Y = matrix(rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y ),n_iter,m)
 post_eta_all_iter = foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %:%
@@ -644,10 +643,10 @@ with
 
 We know the true generative values $\varphi^*$ and $\theta^*$, so we can compute $elpd$ using Monte Carlo samples from the true generative distribution $p^*$ and evaluate this values in the log-density of the bivariate normal $(z_0,y_0|Z,Y)$ from Equation~\ref{eq:smi_post_pred_5_1}.
 
-<<biased_data_07, eval=TRUE, echo=FALSE>>=
+<<biased_data_06, eval=TRUE, echo=FALSE>>=
 # ELPD approximation via Monte Carlo
 set.seed(0)
-n_new = 1000
+n_new = 10
 
 # generate data from the ground-truth distribution
 Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
@@ -699,18 +698,118 @@ Our contribution goes into extending the methods used to perform Bayesian analys
 
 \subsubsection{ Data }
 
-The data consists of measurements of nitrogen and carbon isotopes for a collection of crop remains. There are two datasets: archaeological and calibration, which we will denote by $\mathcal{M}$ and $\mathcal{C}$, respectively. First, the \emph{Archaeological} dataset $\mathcal{M}$, consists of data gathered from excavations of antique crop sites in the region of Mesopotamia. Second, the \emph{Calibration} dataset, $\mathcal{C}$, which was gathered in a controlled experimental setting in recent years. Further characteristics and description of variables on each dataset can be found in the statistical supplement to \cite{Styring2017}.
+The data consists of measurements of nitrogen and carbon isotopes for a collection of crop remains. There are two datasets: archaeological and modern, which we will denote by $\mathcal{A}$ and $\mathcal{M}$, respectively. First, the \emph{Archaeological} dataset $\mathcal{A}$, consists of data gathered from excavations of antique crop sites in the region of Mesopotamia. Second, the \emph{Modern} dataset, $\mathcal{M}$, was gathered in a controlled experimental setting in recent years. Further characteristics and description of variables on each dataset can be found in the statistical supplement to \cite{Styring2017}.
 
 \subsubsection{ The model } \label{sec:agric_model}
 
-We preserved the model stated in \cite{Styring2017}. The main goal of this study is to is to provide statistical evidence for the hypothesis of \emph{extensification} in the ancient urban sites. This hypothesis can be condensed in analysing the strength of the effect of the site size $S_i$ on the corresponding manure level $M_i$ for the records in the archaeological data, $\{i \in \mathcal{M}\}$. The more negative the estimated effect, the stronger the evidence is supporting the extensification hypothesis.
+We preserved the model stated in \cite{Styring2017}. The main goal of this study is to is to provide statistical evidence for the hypothesis of \emph{extensification} in the ancient urban sites. This hypothesis can be condensed in analysing the strength of the effect of the site size $S_i$ on the corresponding manure level $M_i$ for the records in the archaeological data, $\{i \in \mathcal{A}\}$. The more negative the estimated effect, the stronger the evidence is supporting the extensification hypothesis.
 
-However, there is no available information about the Manuring levels in the ancient dataset. This is addressed by using a \emph{Data augmentation} perspective, and consider that all the corresponding values of the manure level in the Archaeological data are missing. We will denote this values as denote these unobserved manure levels as $M_{\mathcal{M}}=\{M_i; i \in \mathcal{M}\}$.
+However, there is no available information about the Manuring levels in the ancient dataset. This is addressed by using a \emph{Data augmentation} perspective, and consider that all the corresponding values of the manure level in the Archaeological data are missing.
 
-The model consists of a two-module model, which integrates archaeological and calibration data so the missing manuring levels can be inferred. The first module is a Proportional Odds model for the missing Manure Levels ($M_{\mathcal{M}}$) in the archaeological data. The second module consists of a linear Gaussian model for the Nitrogen level of the crops ($Z$), which is applicable to both datasets.
+The model consists of a two-module model, which integrates archaeological and calibration data so the missing manuring levels can be inferred. The first module is a Proportional Odds model ($PO$), with the missing Manure Levels in the archaeological data as the ordinal response ($M_i; i \in \mathcal{A}$). The second module consists of a linear Gaussian model ($HM$), applicable to both datasets, with the Nitrogen level of the crops ($Z$) as the response, and Manure levels as one of the predcitors. The graphical representation of the model is depicted in Figure~\ref{fig:agricurb_model}
 
- The setting here is similar to the experiment in Section~\ref{sec:exp_1} above, but incorporating more covariates into both modules ($S$: size of crop field; $P$: indicator of historical context; $R$: rainfall level; $C$ category of crop species). Figure~\ref{fig:graph_model} depicts the graphical representation of the model.
+\begin{figure}[!ht]
+\begin{center}
+\begin{tikzpicture}[thick,scale=1, every node/.style={transform shape}]
+  % initial node: M_arc at (0,0)
+  % Manure Level in archaeological data
+  \node (M_arc) [param] {$M_i$};
 
+  % Paramaters in PO
+  \node (gamma) [param, fill=red!30, above=of M_arc, yshift=1.5cm, xshift=0.2cm] {$\gamma$};
+  \node (alpha) [param, left=of gamma, xshift=0.2cm] {$\alpha$};
+  \node (xi) [param, left=of alpha, xshift=0.2cm] {$\xi_s$};
+  \node (sigma_xi) [param, left=of xi] {$\sigma_{\xi}$};
+  \plate {po_rndeff} {(xi)} {\tiny $s \in S_{\mathcal{A}}$} ;
+
+  % Archaeological data in PO
+  \node (S_arc_po) [data, fill=blue!20, left=of M_arc, xshift=-0.5cm] {$S_i$};
+  \node (P_arc_po) [data, above=of S_arc_po] {$P_i$};
+  \plate {arc_po} {(P_arc_po) (S_arc_po) (M_arc)} {$i \in \mathcal{A}$};
+
+  % Archaeological data in HM
+  \node (C_arc_hm) [data, right=of M_arc] {$C_i$};
+	\node (P_arc_hm) [data, right=of C_arc_hm] {$P_i$};
+	\node (R_arc_hm) [param, below=of P_arc_hm] {$R_i$};
+  \node (Z_arc_hm) [data, below=of C_arc_hm, yshift=-1cm] {$Z_i$};
+  \plate {arc_hm} {(M_arc) (C_arc_hm) (P_arc_hm) (R_arc_hm) (Z_arc_hm)} {$i \in \mathcal{A}$};
+
+  % Paramaters in HM
+  \node (beta) [param, right=of R_arc_hm, xshift=0.2cm] {$\beta$};
+  \node (sigma) [param, below=of beta, yshift=0.2cm] {$\sigma$};
+	\node (v) [param, below=of sigma, yshift=0.2cm] {$v$};
+  \node (zeta) [param, below=of v, yshift=0.2cm] {$\zeta_s$};
+	\node (sigma_zeta) [param, right=of zeta] {$\sigma_{\zeta}$};
+  \plate {hm_rndeff} {(zeta)} {\tiny $s \in S_{\mathcal{A} \cup \mathcal{M}}$};
+
+  % modern data in HM
+  \node (M_mod_hm) [data, right=of P_arc_hm, xshift=1.6cm] {$M_j$};
+  \node (C_mod_hm) [data, right=of M_mod_hm ] {$C_j$};
+	\node (P_mod_hm) [data, right=of C_mod_hm] {$P_j$};
+	\node (R_mod_hm) [data, below=of P_mod_hm] {$R_j$};
+  \node (Z_mod_hm) [data, below=of C_mod_hm, yshift=-1cm] {$Z_j$};
+  \plate {mod_hm} {(M_mod_hm) (C_mod_hm) (P_mod_hm) (R_mod_hm) (Z_mod_hm)} {$j \in \mathcal{M}$};;
+
+  % PO model plate
+  \plate [dotted,label={ \large PO module}]{po} {(M_arc) (alpha) (gamma) (xi) (sigma_xi)  (S_arc_po) (P_arc_po) (po_rndeff) (arc_po) } {}
+  % HM model plate
+	\plate [dotted, label={ \large HM module}]{hm} {(M_arc) (C_arc_hm) (P_arc_hm) (R_arc_hm) (Z_arc_hm) (arc_hm) (M_mod_hm) (C_mod_hm) (P_mod_hm) (R_mod_hm) (Z_mod_hm) (mod_hm) (beta) (sigma) (v) (zeta) (sigma_zeta) (hm_rndeff) } {}
+
+  % SMI line
+	\draw[dashed,red, line width=0.5mm] (-1.1,-1.2) to[out=90, in=180, distance=2cm] (1.1,1.3);
+
+  % arrows
+  % PO parameters
+  \edge {sigma_xi} {xi};
+  \edge {alpha, gamma, xi} {M_arc};
+  % PO data
+  \edge {S_arc_po, P_arc_po} {M_arc};
+
+  % HM parameters
+  \edge {sigma_zeta} {zeta};
+  \edge {beta,zeta,sigma,v} {Z_arc_hm};
+  \edge {beta,zeta,sigma,v} {Z_mod_hm};
+  % HM data
+	\edge {M_arc, C_arc_hm, P_arc_hm, R_arc_hm} {Z_arc_hm};
+  \edge {M_mod_hm, C_mod_hm, P_mod_hm, R_mod_hm} {Z_mod_hm};
+  
+\end{tikzpicture}
+\end{center}
+\caption[Graphical model for agricultural data]{ Graphical representation of the model for the agricultural data. Squares denote observable variables and circles denote unknown quantities (parameters and missing data).The main interest of the study is on the parameter $\gamma$ (red circle), effect of size $S_i$ (blue square) on Manure level $M_i$. The dashed line indicates the cut where SMI is applied for the imputation of missing manure.}
+\label{fig:agricurb_model}
+\end{figure}
+
+The model can be studied from a multi-modular perspective. Indeed, the supplement of \cite{Styring2017} performs Bayesian Multiple Imputation (BMI) to impute the missing manure levels with parameters learnt from the $HM$ module, and therefore \emph{cutting} the influence from the $PO$ module into this imputation. The parameters of the $PO$ module are then infered conditional on the imputed values and other information in the archaelogical data.
+
+In Figure~\ref{fig:agricurb_model_simple} we draw a simplified version of the complete model to clarify how the SMI framework can be applied in this setting. The mapping of variables between the complicated and simple graphs is as follows: the missing manure levels will take the role of $\phi$; the observed data in the $HM$ module is $Z$, the parameters in the $PO$ module will be $\theta$, and the rest of arcahaeological data in the $PO$ module is $Y$.
+
+\begin{figure}[!ht]
+\begin{center}
+\begin{tikzpicture}[thick,scale=1, every node/.style={transform shape}]
+  \node (theta) [param] {$\theta$};
+  \node (varphi) [param, right=of theta, xshift=0.5cm] {$\varphi$};
+  \node (Y) [data, below=of theta] {$Y$};
+  \node (Z) [data, below=of varphi] {$Z$};
+
+  % SMI line
+	\draw[dashed, red, line width=0.5mm] (0.85,0.5) to (0.85,-1.25);
+
+  % arrows
+  % PO parameters
+  \edge {theta, Y} {varphi};
+  \edge {varphi} {Z};
+  
+\end{tikzpicture}
+\end{center}
+\caption{ Simplified representation of the model for the agricultural data.}
+\label{fig:agricurb_model_simple}
+\end{figure}
+
+The simplified version resembles our graphical model in Figure~\ref{fig:toy_multimodular_model}. From here it is more clear how the Bayesian imputation approach took by \cite{Styring2017} is equivalent to a cut model: first learning $\phi$ from the $HM$ module, and then learning $\theta$ conditional on $\phi$ and $Y$. This scheme yields our known cut posterior from Eq.~\ref{eq:cut_post}.
+\[P_{cut}(\varphi,\theta \mid Z,Y) = P(\varphi \mid Z) \; P(\theta \mid Y,\varphi) \]
+
+\subsection{Epidemiological study: HPV virus and cervical Cancer} \label{sec:hpv_analysis}
+Bla
 
 \bibliographystyle{apalike} %use the apalike bibliography style
 \bibliography{Mendeley} % Mendeley bibliography
