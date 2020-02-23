@@ -112,8 +112,10 @@ mcmc_agric_model <- function( data_arc,
                               PO_site_rnd_eff=TRUE,
                               HM_site_rnd_eff=TRUE,
                               
-                              n_iter=100000,
-                              n_iter_sub=10,
+                              n_iter = 10000,
+                              n_iter_sub = 100,
+                              n_warmup = 1e3,
+                              n_thin = 2,
                               
                               theta_ini=NULL,
                               theta_min_max=NULL,
@@ -395,6 +397,8 @@ mcmc_agric_model <- function( data_arc,
                                       HM_site_rnd_eff=HM_site_rnd_eff,
                                       
                                       n_iter=n_iter_adapt,
+                                      n_warmup = 0,
+                                      n_thin = 1,
                                       
                                       theta = theta_ini_adapt[1,],
                                       theta_min_max = theta_min_max,
@@ -506,7 +510,9 @@ mcmc_agric_model <- function( data_arc,
                                   PO_site_rnd_eff=PO_site_rnd_eff,
                                   HM_site_rnd_eff=HM_site_rnd_eff,
                                   
-                                  n_iter=n_iter,
+                                  n_iter = n_iter,
+                                  n_warmup = n_warmup,
+                                  n_thin = n_thin,
                                   
                                   theta=theta_mcmc_ini,
                                   theta_min_max=theta_min_max,
@@ -544,7 +550,7 @@ mcmc_agric_model <- function( data_arc,
     comb <- function(...) {
       mapply('rbind', ..., SIMPLIFY=FALSE)
     }
-    mcmc_res_smi = foreach( iter_i = 1:n_iter, .combine='comb', .multicombine=TRUE ) %do% {
+    mcmc_res_smi = foreach( iter_i = 1:nrow(mcmc_res[["ManureLevel_imp_mcmc"]]), .combine='comb', .multicombine=TRUE ) %do% {
       # iter_i = 1
       mcmc_res_sub = mcmc_PO( Y = mcmc_res[["ManureLevel_imp_mcmc"]][iter_i,],
                               X = X,
@@ -558,7 +564,7 @@ mcmc_agric_model <- function( data_arc,
                               
                               rnd_eff=PO_site_rnd_eff,
                               
-                              n_iter=n_iter_sub,
+                              n_iter = n_iter_sub,
                               
                               theta = mcmc_res$theta_mcmc[iter_i,theta_names_po],
                               theta_min_max = theta_min_max[theta_names_po,],

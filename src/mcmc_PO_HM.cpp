@@ -189,6 +189,8 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
                                const bool HM_site_rnd_eff,
                                
                                const unsigned int n_iter,
+                               const unsigned int n_warmup,
+                               const unsigned int n_thin,
                                
                                arma::colvec theta,
                                const arma::mat theta_min_max,
@@ -235,6 +237,7 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
   
   // Defining Auxiliar variables
   unsigned int iter_i=0;
+  
   // unsigned int i=0;
   unsigned int j=0;
   unsigned int theta_j=0;
@@ -253,6 +256,10 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
   // number of parameters
   unsigned int n_par = theta.n_rows;
   
+  // MCMC warm-up and thinning //
+  // vector with the iterations that will be kept and returned by the function
+  arma::uvec iter_out = arma::regspace<arma::uvec>(n_warmup+1,n_thin,n_iter);
+  arma::uvec iter_i_save;
   
   // OUTPUT
   arma::mat theta_mcmc;
@@ -260,16 +267,16 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
   arma::mat Rainfall_imp_mcmc;
   arma::cube loglik_mcmc;
   
-  theta_mcmc = arma::zeros<arma::mat>(n_iter,n_par);
+  theta_mcmc = arma::zeros<arma::mat>(iter_out.n_rows,n_par);
   if(keep_imp){
-    ManureLevel_imp_mcmc = arma::zeros<arma::mat>(n_iter,n_obs_arc);
-    Rainfall_imp_mcmc = arma::zeros<arma::mat>(n_iter,n_obs_arc);
+    ManureLevel_imp_mcmc = arma::zeros<arma::mat>(iter_out.n_rows,n_obs_arc);
+    Rainfall_imp_mcmc = arma::zeros<arma::mat>(iter_out.n_rows,n_obs_arc);
   } else {
     ManureLevel_imp_mcmc = arma::zeros<arma::mat>(1,1);
     Rainfall_imp_mcmc = arma::zeros<arma::mat>(1,1);
   }
   if(keep_ll){
-    loglik_mcmc = arma::zeros<arma::cube>(n_iter,n_obs_arc+n_obs_mod,2);
+    loglik_mcmc = arma::zeros<arma::cube>(iter_out.n_rows,n_obs_arc+n_obs_mod,2);
   } else {
     loglik_mcmc = arma::zeros<arma::cube>(1,1,1);
   }
@@ -427,31 +434,40 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
   if( arma::sum( cur_probs.rows(0,1) ) == -INFINITY ){ throw std::range_error("invalid model parameters, loglik=-INFINITY! (code 1)"); }
   
   //// Recording initial values in the chain ////
-  theta_mcmc.row(0) = theta.t();
-  if(keep_imp){
-    ManureLevel_imp_mcmc.row(0) = ManureLevel_imp.t();
-    Rainfall_imp_mcmc.row(0) = Rainfall_imp.t();
-  }
-  if(keep_ll){
-    loglik_mcmc.subcube(0,0,0  , 0,n_obs_arc+n_obs_mod-1,1) = loglik_i_PO_HM( Y_PO,
-                        data_arc.col(0),
-                        Site_PO_dummie,
-                        
-                        theta.rows( arma::span(0,1) ), // alpha_PO
-                        theta.row( 2 ), // gamma_PO
-                        theta.rows( arma::span(3,2+n_sites_arc) ), // eta_PO
-                        theta( 3+n_sites_arc ), // sigma_eta_PO
-                        
-                        Y_HM,
-                        X_HM,
-                        Site_HM_dummie,
-                        ind_v_HM,
-                        
-                        theta.rows( arma::span(4+n_sites_arc,7+n_sites_arc) ), // beta_HM
-                        theta.rows( arma::span(8+n_sites_arc,7+2*n_sites_arc+n_sites_mod) ), // eta_HM
-                        theta( 8+2*n_sites_arc+n_sites_mod ), // sigma_HM
-                        theta( 9+2*n_sites_arc+n_sites_mod ), // v_HM
-                        theta( 10+2*n_sites_arc+n_sites_mod ) ); // sigma_eta_HM 
+  iter_i = 0;
+  if( arma::any( iter_out==iter_i ) ) {
+    iter_i_save = arma::find( iter_out==iter_i );
+    // Save theta
+    theta_mcmc.row( iter_i_save(0) ) = theta.t();
+    
+    // Save imputed data
+    if(keep_imp){
+      ManureLevel_imp_mcmc.row( iter_i_save(0) ) = ManureLevel_imp.t();
+      Rainfall_imp_mcmc.row( iter_i_save(0) ) = Rainfall_imp.t();
+    }
+    
+    // Save log-likelihood
+    if(keep_ll){
+      loglik_mcmc.subcube(iter_i_save(0),0,0  , iter_i_save(0),n_obs_arc+n_obs_mod-1,1) = loglik_i_PO_HM( Y_PO,
+                          data_arc.col(0),
+                          Site_PO_dummie,
+                          
+                          theta.rows( arma::span(0,1) ), // alpha_PO
+                          theta.row( 2 ), // gamma_PO
+                          theta.rows( arma::span(3,2+n_sites_arc) ), // eta_PO
+                          theta( 3+n_sites_arc ), // sigma_eta_PO
+                          
+                          Y_HM,
+                          X_HM,
+                          Site_HM_dummie,
+                          ind_v_HM,
+                          
+                          theta.rows( arma::span(4+n_sites_arc,7+n_sites_arc) ), // beta_HM
+                          theta.rows( arma::span(8+n_sites_arc,7+2*n_sites_arc+n_sites_mod) ), // eta_HM
+                          theta( 8+2*n_sites_arc+n_sites_mod ), // sigma_HM
+                          theta( 9+2*n_sites_arc+n_sites_mod ), // v_HM
+                          theta( 10+2*n_sites_arc+n_sites_mod ) ); // sigma_eta_HM 
+    }
   }
   
   Rcpp::Rcout << "Starting MCMC..." << std::endl << "progress:" << std::endl;
@@ -1209,34 +1225,40 @@ Rcpp::List mcmc_PO_HM_powered( const arma::mat data_arc,
       cur_probs = prop_probs;
     }
     
-    //// Compute log likelihood with current parameter values ////
-    if(keep_ll){
-      loglik_mcmc.subcube(iter_i,0,0  , iter_i,n_obs_arc+n_obs_mod-1,1) = loglik_i_PO_HM( Y_PO,
-                          data_arc.col(0),
-                          Site_PO_dummie,
-                          
-                          theta.rows( arma::span(0,1) ), // alpha_PO
-                          theta.row( 2 ), // gamma_PO
-                          theta.rows( arma::span(3,2+n_sites_arc) ), // eta_PO
-                          theta( 3+n_sites_arc ), // sigma_eta_PO
-                          
-                          Y_HM,
-                          X_HM,
-                          Site_HM_dummie,
-                          ind_v_HM,
-                          
-                          theta.rows( arma::span(4+n_sites_arc,7+n_sites_arc) ), // beta_HM
-                          theta.rows( arma::span(8+n_sites_arc,7+2*n_sites_arc+n_sites_mod) ), // eta_HM
-                          theta( 8+2*n_sites_arc+n_sites_mod ), // sigma_HM
-                          theta( 9+2*n_sites_arc+n_sites_mod ), // v_HM
-                          theta( 10+2*n_sites_arc+n_sites_mod ) ); // sigma_eta_HM 
-    }
-    
     //// Recording updated values in the chain ////
-    theta_mcmc.row(iter_i) = theta.t();
-    if(keep_imp){
-      ManureLevel_imp_mcmc.row(iter_i) = ManureLevel_imp.t();
-      Rainfall_imp_mcmc.row(iter_i) = Rainfall_imp.t();
+    if( arma::any( iter_out==iter_i ) ) {
+      iter_i_save = arma::find( iter_out==iter_i );
+      // Save theta
+      theta_mcmc.row( iter_i_save(0) ) = theta.t();
+      
+      // Save imputed data
+      if(keep_imp){
+        ManureLevel_imp_mcmc.row( iter_i_save(0) ) = ManureLevel_imp.t();
+        Rainfall_imp_mcmc.row( iter_i_save(0) ) = Rainfall_imp.t();
+      }
+      
+      //// Compute and save log-likelihoods with current parameter values ////
+      if(keep_ll){
+        loglik_mcmc.subcube(iter_i_save(0),0,0  , iter_i_save(0),n_obs_arc+n_obs_mod-1,1) = loglik_i_PO_HM( Y_PO,
+                            data_arc.col(0),
+                            Site_PO_dummie,
+                            
+                            theta.rows( arma::span(0,1) ), // alpha_PO
+                            theta.row( 2 ), // gamma_PO
+                            theta.rows( arma::span(3,2+n_sites_arc) ), // eta_PO
+                            theta( 3+n_sites_arc ), // sigma_eta_PO
+                            
+                            Y_HM,
+                            X_HM,
+                            Site_HM_dummie,
+                            ind_v_HM,
+                            
+                            theta.rows( arma::span(4+n_sites_arc,7+n_sites_arc) ), // beta_HM
+                            theta.rows( arma::span(8+n_sites_arc,7+2*n_sites_arc+n_sites_mod) ), // eta_HM
+                            theta( 8+2*n_sites_arc+n_sites_mod ), // sigma_HM
+                            theta( 9+2*n_sites_arc+n_sites_mod ), // v_HM
+                            theta( 10+2*n_sites_arc+n_sites_mod ) ); // sigma_eta_HM 
+      }
     }
     
     // MCMC progress monitoring //
