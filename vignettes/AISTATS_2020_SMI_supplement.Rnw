@@ -97,11 +97,12 @@ library(aistats2020smi)
 \section{Background methods}\label{sec:background}
 
 % Geoff comments on misspecification
-What is model misspecification? Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
+Here are a few remarks on model misspecification. Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. This is defined in more detail in Section~\ref{sec:opt_eta}. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
 
 \subsection{Explicit formulae for cut posterior}
 
-Recall the graphical analysed in the main text
+The graphical model analysed in the main text is shown in Figure~\ref{fig:toy_multimodular_model}.
+
 \begin{figure}[!ht]
 \begin{center}
 \begin{tikzpicture}
@@ -130,8 +131,6 @@ The \textbf{conventional (full) posterior} for this model is:
  &= p(Z,Y,\varphi,\theta ) \; \frac{ 1 }{ p(Z,Y)_{\theta} } \nonumber \\
  &= p(Z \mid \varphi) \; p(Y \mid \varphi, \theta ) \; p(\varphi, \theta) \; \frac{ 1 }{ p(Z,Y)_{\theta} }
 \end{align}
-
-
 
 The \textbf{cut posterior} for this model is defined \citep{Plummer2015} as:
 \begin{align} \label{eq:cut_post}
@@ -347,28 +346,33 @@ p_{smi,\eta}&(\varphi,\theta,\tilde\theta \mid Z,Y) K(\varphi',\theta',\tilde\th
 
 \subsection{Scalability of MCMC. Big-O runtime and bottlenecks}
 
-Our baseline is standard Bayes-MCMC on the original full model.
-Let $\tau_{\phi,\theta}$ be the Integrated Autocorrelation Time (IACT) of Bayes-MCMC. If the Effective Sample Size (ESS) is $N$ then we have $T=N\tau_{\phi,\theta}$ MCMC steps. If one Bayes-MCMC step has unit cost then the overall cost is $W_{BM}=T$[time]. This doesn't parallelise.
+Our baseline is standard Bayes-MCMC on the original full model. We suppose for simplicity this was implemented using separate updates for $\theta|\varphi$ and $\varphi|\theta$, though these need not be Gibbs updates.
+Let $\tau_{\varphi,\theta}$ be the Integrated Autocorrelation Time (IACT) of Bayes-MCMC. If the Effective Sample Size (ESS) of the full Bayes-MCMC output is $N$ then we must have done $T=N\tau_{\varphi,\theta}$ MCMC steps. If {\it one Bayes-MCMC step updating both $\theta$ and $\varphi$ has unit cost} then the overall cost is $W_{bm}=T$[time]. This doesn't parallelise.
 
 The SMI posterior is \[
-p_{smi,\eta}(\phi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\phi,\tilde\theta|Y,Z)p(\theta|Y,\phi).
+p_{\eta-smi}(\varphi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\varphi,\tilde\theta|Y,Z)p(\theta|Y,\varphi).
 \]
-If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\phi,\tilde\theta|Y,Z)$ then the work sampling $(\phi,\tilde\theta)$ is $W_{Bayes}$. Thin the $\phi$ samples every $\tau_{\phi,\theta}$ steps to get
-an ESS about $N$ (rough but reasonable).
+If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\varphi,\tilde\theta|Y,Z)$ then the work sampling $(\varphi,\tilde\theta)$ at one $\eta$-value is $W_{Bayes}$. Thin the $\varphi$ samples every $\tau_{\varphi,\theta}$ steps to get an ESS about $N$ (this is rough, because the target changes with $\eta$, but reasonable if we allow for some tuning of the MCMC with $\eta$ - we didnt need to tune in our examples).
 
-Again we use the Bayes-MCMC update for $p(\theta|Y,\phi)$ in SMI. Let $\tau_\theta$ be the IACT. Typically, $\tau_\theta<\tau_{\phi,\theta}$ (lower dimension, proof in special case) so take $\tau_\theta=\tau_{\phi,\theta}$ (conservative).
+We use the Bayes-MCMC update for $p(\theta|Y,\varphi)$ in SMI. Let $\tau_\theta$ be the IACT. Typically, $\tau_\theta<\tau_{\varphi,\theta}$ (the target has lower dimension; illustrative proofs can be given in simple special cases) so take $\tau_\theta=\tau_{\varphi,\theta}$ (conservative, and note that these ``side-chains'' targeting $p(\theta|Y,\varphi)$ can be started close to equilibrium using the $\theta$-value output from sampling at the previous step).
 We run the $\theta$-sampler to equilibrium (initialise $\theta^{(t)}$-run with $\theta^{(t-1)}$). Suppose this takes $K\tau_\theta$ steps ($K\approx 5$ is reasonable).
-We have $M_{t}$ threads on each of $M_{p}$ machines and $\theta$-sampling parallelizes with small communication overhead.
-A runtime cost for $\theta$-updates equal 1 is conservative, as Bayes-MCMC did $(\phi,\theta)$-updates, so $(\phi,\theta)$-sampling at one $\eta$-value costs about \[
-W_{\eta}=W_{BM}(1+K/M_{t}).
-\]
-Now repeat for $J$ $\eta$-values ($J\approx 20$) using $M_{p}$ machines. Total cost is
-\[
-W_{smi}=W_{Bayes}(1+K/M_{t}) \times J/M_{p}.
-\]
-For eg if we assign resources as $M_{p}=J$ and $M_{t}=1$ (use threads for coarse grained stuff) the SMI cost is about $5-10$ times Bayes-MCMC. This reflects our experience.
 
-Finally, we compute and smooth the WAIC across the $J$ runs. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly, \[ W_{smi}\simeq 10 W_{Bayes} \] should be achievable without alot of work.
+In the following we assume simulation at different $\eta$-values is parallelized over machines, while simulation of $\theta|\phi$ is parallelized over threads on a machine. Suppose we have $M_{t}$ threads on each of $M_{p}$ machines. The $\theta$-sampling parallelizes with a small communication overhead if the time to do $K\tau_{\varphi,\theta}$ of the $\theta|\varphi$-updates is significantly larger than the communication time. 
+The cost of the $\theta$-update in the second stage of SMI is no more than the cost of one update in the original Bayes-MCMC where both $\theta$ and $\varphi$ were updated, so a runtime cost for $\theta$-updates equal one unit is conservative. It follows that $(\tilde\theta,\varphi,\theta)$-sampling at one $\eta$-value costs about \[
+W_{\eta}=W_{bm}(1+K/M_{t}).
+\]
+
+We have to repeat this $J$ times, sampling $p_{\eta-smi}(\varphi,\tilde\theta,\theta|Y,Z)$ for each of $J$ different $\eta$-values spaced between $\eta=0$ and $\eta=1$ ($J\approx 20$ should be enough) using $M_{p}$ machines. This larger task parallelises essentially perfectly. The total cost is
+\[
+W_{smi}=W_{bm}(1+K/M_{t}) \times J/M_{p}.
+\]
+For eg if we assign resources as $M_{p}=J$ and $M_{t}=1$ (just parallelise over $\eta$) the SMI cost is not worse than about $10$ times the cost of doing Bayes-MCMC. This reflects our experience.
+
+Finally, we compute and smooth the WAIC across the $J$ runs at different $\eta$-values. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly, 
+\[W_{smi}\simeq 10 W_{bm}\] 
+should be achievable without a great deal of work on top of the cost of implementing and running standard Bayes-MCMC.
+
+
 
 \section{Data Analyses} \label{sec:data_analyses}
 
