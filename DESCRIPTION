@@ -3,24 +3,40 @@ Type: Package
 Title: Semi-Modular Inference
 Version: 0.1.1
 Date: 2020-02-29
-Authors@R: c(person("Christian", "Carmona", role = c("aut", "cre"), email = "carmona@stats.ox.ac.uk"))
-Description: Code for the AISTATS 2020 article: Semi-Modular Inference by Carmona & Nicholls (2020)
-License: GPL (>= 2)
+Authors@R: 
+    person(given = "Christian",
+           family = "Carmona",
+           role = c("aut", "cre"),
+           email = "carmona@stats.ox.ac.uk",
+           comment = c(ORCID = "0000-0003-0224-4968"))
+Description: Code for the AISTATS 2020 article: Semi-Modular Inference by Carmona & Nicholls (2020).
+License: Apache License (>= 2.0)
 Encoding: UTF-8
 LazyData: TRUE
-Imports:
+Biarch: TRUE
+Depends: 
+    R (>= 3.4.0)
+Imports: 
     coda,
+    doRNG,
+    foreach,
     ggplot2,
     ggthemes,
+    methods,
     nlme,
     ordinal,
+    Rcpp (>= 0.12.0),
+    rstan (>= 2.18.1),
+    rstantools (>= 2.0.0)
+LinkingTo: 
+    BH (>= 1.66.0),
     Rcpp,
     RcppArmadillo,
-    reshape
-LinkingTo:
-    Rcpp (>= 0.12),
-    RcppArmadillo (>= 0.8)
-Suggests: 
+    RcppEigen (>= 0.3.3.3.0),
+    rstan (>= 2.18.1),
+    StanHeaders (>= 2.18.0)
+Suggests:
     utils
+SystemRequirements: GNU make
 VignetteBuilder: utils
 RoxygenNote: 7.0.2

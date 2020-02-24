@@ -1,4 +1,5 @@
-^.*\.Rproj$
+^aistats2020smi\.Rproj$
 ^\.Rproj\.user$
+^LICENSE\.md$
 ^doc$
 ^Meta$

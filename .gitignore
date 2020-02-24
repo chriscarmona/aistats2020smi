@@ -8,7 +8,9 @@ inst/include/aistats2020smi*.h
 man
 Meta
 **/**/.DS_Store
-**/**/RcppExports.cpp
+src/RcppExports.cpp
+src/stanExports*.cc
+src/stanExports*.h
 **/**/RcppExports.R
 src/*.o
 src/*.so
