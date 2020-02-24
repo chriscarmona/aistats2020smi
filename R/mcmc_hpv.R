@@ -89,12 +89,13 @@
 #'
 #' }
 #'
-#' @importFrom Rcpp sourceCpp
-#' @importFrom stats runif
 #' @import nlme
 #' @import ordinal
+#' @import doRNG
 #'
 #' @export
+#'
+
 mcmc_hpv <- function( HPV, # HPV data
 
                       # SMI degree of influence for each module
@@ -137,6 +138,7 @@ mcmc_hpv <- function( HPV, # HPV data
   HPV_data_stan$eta_pois = 1
   HPV_data_stan$eta_binom = 0
 
+  imp_i=1
   hpv_mcmc_smi_stage2 <- foreach::foreach( imp_i = 1:nrow(hpv_mcmc_pow$phi),
                             .combine = rbind ) %dorng% {
                               # imp_i=1

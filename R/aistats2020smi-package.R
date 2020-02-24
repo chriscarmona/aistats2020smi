@@ -4,22 +4,21 @@
 #'
 #' @docType package
 #' @name aistats2020smi-package
-#' 
+#'
 #' @aliases aistats2020smi
-#' 
+#'
 #' @useDynLib aistats2020smi, .registration = TRUE
-#' 
-#' @import methods
-#' @import Rcpp
+#'
 #' @import coda
 #' @import ggplot2
 #' @import ggthemes
+#' @import methods
 #' @import nlme
 #' @import ordinal
 #' @import Rcpp
 #' @import RcppArmadillo
 #' @import reshape
-#' 
+#'
 #' @importFrom rstan sampling
 #'
 #' @references

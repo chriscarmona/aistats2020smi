@@ -1,5 +1,6 @@
 # Default colors in ggplot
-#' @import ggplot2 ggthemes
+#' @import ggplot2
+#' @import ggthemes
 #' @export
 set_ggtheme <- function( resize=FALSE ){
   theme_set( theme_bw() )
@@ -20,11 +21,11 @@ set_ggtheme <- function( resize=FALSE ){
 }
 
 # Default colors in ggplot
-#' @export
+#' @importFrom grDevices hcl
 gg_color_hue <- function(n) {
   # https://stackoverflow.com/questions/8197559/emulate-ggplot2-default-color-palette
   hues = seq(15, 375, length = n + 1)
-  hcl(h = hues, l = 65, c = 100)[1:n]
+  grDevices::hcl(h = hues, l = 65, c = 100)[1:n]
 }
 
 #' @importFrom stats var
@@ -43,7 +44,6 @@ R_hat.mcmc <- function(x,m) {
   R_hat
 }
 
-#' @export
 bounce_limit <- function(x,a,b){
   while( (x<a) || (x>b) ) {
     if(x < a) {
@@ -56,37 +56,34 @@ bounce_limit <- function(x,a,b){
   return(x)
 }
 
-#' @export
 mapto01 <- function(x,na.rm=T){
   # Function to map one variable to the range 0 1
   (x-min(x,na.rm=na.rm))/diff(range(x,na.rm=na.rm))
 }
 
 #' @import grid
-#' @export
 multiplot <- function(..., plotlist=NULL, cols) {
-  require(grid)
-  
+
   # Make a list from the ... arguments and plotlist
   plots <- c(list(...), plotlist)
-  
+
   numPlots = length(plots)
-  
+
   # Make the panel
   plotCols = cols                          # Number of columns of plots
   plotRows = ceiling(numPlots/plotCols) # Number of rows needed, calculated from # of cols
-  
+
   # Set up the page
   grid::grid.newpage()
   grid::pushViewport(grid::viewport(layout = grid::grid.layout(plotRows, plotCols)))
   vplayout <- function(x, y)
     grid::viewport(layout.pos.row = x, layout.pos.col = y)
-  
+
   # Make each plot, in the correct location
   for (i in 1:numPlots) {
     curRow = ceiling(i/plotCols)
     curCol = (i-1) %% plotCols + 1
     print(plots[[i]], vp = vplayout(curRow, curCol ))
   }
-  
+
 }

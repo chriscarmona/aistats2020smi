@@ -90,10 +90,12 @@
 #'
 #' }
 #'
-#' @importFrom Rcpp sourceCpp
-#' @importFrom stats runif
+#' @import foreach
+#' @import loo
 #' @import nlme
 #' @import ordinal
+#'
+#' @importFrom stats runif
 #'
 #' @export
 
@@ -466,7 +468,7 @@ mcmc_agric_model <- function( data_arc,
                 theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- ( opt_accept_rate - aux[1] ) / aux[2]
               } else {
                 # If the relation is different, then vary the size of the interval randomly
-                theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- theta_prop_int_adapt[adapt_i,theta_names[par_i]] * runif(1,0.5,2)
+                theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- theta_prop_int_adapt[adapt_i,theta_names[par_i]] * rstats::runif(1,0.5,2)
               }
             }
           }
@@ -548,6 +550,8 @@ mcmc_agric_model <- function( data_arc,
     comb <- function(...) {
       mapply('rbind', ..., SIMPLIFY=FALSE)
     }
+
+    iter_i=1
     mcmc_res_smi = foreach::foreach( iter_i = 1:nrow(mcmc_res[["ManureLevel_imp_mcmc"]]), .combine='comb', .multicombine=TRUE ) %do% {
       # iter_i = 1
       mcmc_res_sub = mcmc_PO( Y = mcmc_res[["ManureLevel_imp_mcmc"]][iter_i,],

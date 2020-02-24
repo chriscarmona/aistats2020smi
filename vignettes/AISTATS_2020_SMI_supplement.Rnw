@@ -1,3 +1,11 @@
+% !Rnw weave = Sweave
+% \VignetteEngine{utils::Sweave}
+% \VignetteIndexEntry{ Supplementary material to Carmona and Nicholls (2020) Semi-Modular Inference }
+% \VignetteDepends{ magrittr, ggplot2, dplyr, tidyr, foreach, doParallel, doRNG, cowplot, abind, mvtnorm }
+% \VignetteKeyword{AISTATS}
+% \VignetteKeyword{SMI}
+% \VignetteKeyword{Supplement}
+
 \documentclass{article}
 
 %\usepackage{arxiv}
@@ -45,7 +53,8 @@ set.seed(0)
 compute_mcmc = FALSE
 
 # loading required packages #
-req.pck <- c( "tidyverse","foreach","doParallel","doRNG","cowplot",
+req.pck <- c( "magrittr","ggplot2","dplyr","tidyr",
+              "foreach","doParallel","doRNG","cowplot",
               "abind","mvtnorm" )
 req.pck <- sapply(X=req.pck,FUN=require,character.only=T)
 if(!all(req.pck)) {
@@ -357,7 +366,7 @@ If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\varphi,\tilde\the
 We use the Bayes-MCMC update for $p(\theta|Y,\varphi)$ in SMI. Let $\tau_\theta$ be the IACT. Typically, $\tau_\theta<\tau_{\varphi,\theta}$ (the target has lower dimension; illustrative proofs can be given in simple special cases) so take $\tau_\theta=\tau_{\varphi,\theta}$ (conservative, and note that these ``side-chains'' targeting $p(\theta|Y,\varphi)$ can be started close to equilibrium using the $\theta$-value output from sampling at the previous step).
 We run the $\theta$-sampler to equilibrium (initialise $\theta^{(t)}$-run with $\theta^{(t-1)}$). Suppose this takes $K\tau_\theta$ steps ($K\approx 5$ is reasonable).
 
-In the following we assume simulation at different $\eta$-values is parallelized over machines, while simulation of $\theta|\phi$ is parallelized over threads on a machine. Suppose we have $M_{t}$ threads on each of $M_{p}$ machines. The $\theta$-sampling parallelizes with a small communication overhead if the time to do $K\tau_{\varphi,\theta}$ of the $\theta|\varphi$-updates is significantly larger than the communication time. 
+In the following we assume simulation at different $\eta$-values is parallelized over machines, while simulation of $\theta|\phi$ is parallelized over threads on a machine. Suppose we have $M_{t}$ threads on each of $M_{p}$ machines. The $\theta$-sampling parallelizes with a small communication overhead if the time to do $K\tau_{\varphi,\theta}$ of the $\theta|\varphi$-updates is significantly larger than the communication time.
 The cost of the $\theta$-update in the second stage of SMI is no more than the cost of one update in the original Bayes-MCMC where both $\theta$ and $\varphi$ were updated, so a runtime cost for $\theta$-updates equal one unit is conservative. It follows that $(\tilde\theta,\varphi,\theta)$-sampling at one $\eta$-value costs about \[
 W_{\eta}=W_{bm}(1+K/M_{t}).
 \]
@@ -368,8 +377,8 @@ W_{smi}=W_{bm}(1+K/M_{t}) \times J/M_{p}.
 \]
 For eg if we assign resources as $M_{p}=J$ and $M_{t}=1$ (just parallelise over $\eta$) the SMI cost is not worse than about $10$ times the cost of doing Bayes-MCMC. This reflects our experience.
 
-Finally, we compute and smooth the WAIC across the $J$ runs at different $\eta$-values. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly, 
-\[W_{smi}\simeq 10 W_{bm}\] 
+Finally, we compute and smooth the WAIC across the $J$ runs at different $\eta$-values. This part is fast output-analysis. The ESS must be big enough to get stable WAIC estimates, but WAIC is "nice" to estimate. Very roughly,
+\[W_{smi}\simeq 10 W_{bm}\]
 should be achievable without a great deal of work on top of the cost of implementing and running standard Bayes-MCMC.
 
 
@@ -444,7 +453,7 @@ The generative parameters described in the main text are as follows
 n=25 # Sample size for Z
 m=50 # Sample size for Y
 
-phi = 0 
+phi = 0
 theta = 1 # bias
 
 sigma_z = 2 # variance for Z
@@ -481,11 +490,11 @@ mse_eta_all = post_eta_all[[2]] + ( post_eta_all[[1]] - t( matrix(param_true,3,l
 # Plot posterior vs true value
 aistats2020smi::set_ggtheme()
 post_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
-  
+
   p = data.frame( eta=eta_all,
                   post_mean=post_eta_all[[1]][,par_i],
                   post_sd=post_eta_all[[2]][,par_i]^0.5 ) %>%
-    ggplot() + 
+    ggplot() +
     geom_line( aes(x=eta,y=post_mean), col='red' ) +
     geom_line( aes(x=eta,y=post_mean+post_sd), col='blue', lty=3 ) +
     geom_line( aes(x=eta,y=post_mean-post_sd), col='blue', lty=3 ) +
@@ -532,7 +541,7 @@ In the first simulation study of the main text we display $MSE(\varphi)$ and $MS
 
 <<biased_data_05, eval=TRUE, echo=FALSE>>=
 set.seed(123)
-  
+
 # Average Mean Square Error #
 
 # Compute Posterior mean and sd for each iteration
@@ -560,7 +569,7 @@ mse_plot_all = foreach::foreach( par_i = seq_along(param_names) ) %do% {
   # par_i=1
   p = data.frame( eta=eta_all,
                   mse=MSE_average[,par_i] ) %>%
-    ggplot() + 
+    ggplot() +
     geom_line( aes(x=eta,y=mse), col='red' ) +
     labs(y=paste("MSE( ",param_names[par_i]," )",sep=""))
   p
@@ -575,7 +584,7 @@ aistats2020smi::set_ggtheme()
 p = MSE_average %>%
   `colnames<-`(param_names) %>%
   as.data.frame() %>%
-  mutate(eta=eta_all) %>%
+  dplyr::mutate(eta=eta_all) %>%
   tidyr::pivot_longer(cols=all_of(param_names),names_to='parameter') %>%
   dplyr::filter(parameter %in% c('theta','theta_tilde')) %>%
   ggplot() +
@@ -776,7 +785,7 @@ The model consists of a two-module model, which integrates archaeological and ca
   % HM data
 	\edge {M_arc, C_arc_hm, P_arc_hm, R_arc_hm} {Z_arc_hm};
   \edge {M_mod_hm, C_mod_hm, P_mod_hm, R_mod_hm} {Z_mod_hm};
-  
+
 \end{tikzpicture}
 \end{center}
 \caption[Graphical model for agricultural data]{ Graphical representation of the model for the agricultural data. Squares denote observable variables and circles denote unknown quantities (parameters and missing data).The main interest of the study is on the parameter $\gamma$ (red circle), effect of size $S_i$ (blue square) on Manure level $M_i$. The dashed line indicates the cut where SMI is applied for the imputation of missing manure.}
@@ -802,7 +811,7 @@ In Figure~\ref{fig:agricurb_model_simple} we draw a simplified version of the co
   % PO parameters
   \edge {theta, Y} {varphi};
   \edge {varphi} {Z};
-  
+
 \end{tikzpicture}
 \end{center}
 \caption{ Simplified representation of the model for the agricultural data.}

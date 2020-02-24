@@ -6,7 +6,6 @@
 
 // [[Rcpp::interfaces(r, cpp)]]
 
-//' @export
 // [[Rcpp::export]]
 arma::mat categ_to_dummie( const arma::vec x,
                            const arma::vec categ_x ) {
@@ -26,7 +25,6 @@ double sign( const double val ) {
   return (0 < val) - (val < 0);
 }
 
-//' @export
 // [[Rcpp::export]]
 double bounce_limit( double x,
                      const double a,
@@ -42,14 +40,13 @@ double bounce_limit( double x,
   return x;
 }
 
-//' @export
 // [[Rcpp::export]]
 double dinvgamma( const double x,
-                  const double alpha, //shape 
+                  const double alpha, //shape
                   const double beta, //scale
                   const unsigned int lg=0 ) {
   double logpdf;
-  
+
   if ( (alpha <= 0.0) | (beta <= 0.0) | (x<= 0.0) ) {
     if( lg==1 ) {
       return -INFINITY;
@@ -57,14 +54,14 @@ double dinvgamma( const double x,
       return 0.0;
     }
   }
-  
+
   logpdf = alpha * std::log(beta) - R::lgammafn(alpha) - (alpha + 1.0) * std::log(x) - (beta/x);
-  
+
   if( lg==1 ) {
     return logpdf;
   } else if ( lg == 0 ) {
     return std::exp(logpdf);
   }
-  
+
   return NAN;
 }

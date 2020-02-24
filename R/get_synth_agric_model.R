@@ -27,60 +27,12 @@
 #'
 #' @examples
 #'
-#' require(ggplot2)
+#' rnorm(1)
 #'
-#' # Defining synthetic model parameters #
-#' theta <- theta_PO1_HM1_HM1_ex
-#' theta
-#'
-#' # Generating synthetic data #
-#' synth_data <- get_synth_agric_data( theta = theta,
-#'                                      arc_datasets="NMeso" )
-#' synth_agric_data <- synth_data[[1]]
-#' synth_agric_data_complete <- synth_data[[2]]
-#' synth_agric_data$ManureLevel <- factor( synth_agric_data$ManureLevel,
-#'                                          levels=c("low","medium","high"))
-#' synth_agric_data_complete$ManureLevel <- factor( synth_agric_data_complete$ManureLevel,
-#'                                                   levels=c("low","medium","high"))
-#'
-#' # archaeological data identifier
-#' id_arch <- !is.element(synth_agric_data$dataset,"modern")
-#'
-#' #####
-#' # Checking data characteristics
-#' #####
-#'
-#' # PO model #
-#' # Probabilities associated with the ManureLevel by Size
-#' aux <- data.frame(Size=synth_agric_data$Size,synth_data[[3]])
-#' colnames(aux) <- c("Size","low","medium","high")
-#' aux <- reshape::melt(aux[id_arch,],id="Size")
-#' colnames(aux) <- c("Size","ManureLevel","probability")
-#' p <- ggplot( data=aux )
-#' p <- p + geom_point( aes(x=Size,y=probability,colour=ManureLevel))
-#' p <- p + geom_line( aes(x=Size,y=probability,colour=ManureLevel))
-#' p <- p + coord_cartesian(xlim=c(0,1), ylim=c(0,1), expand = TRUE)
-#' p
-#' rm(aux,p)
-#'
-#' # PO model #
-#' # Sampled ManureLevel by Size  (assuming no missing data)
-#' p <- ggplot( aes(x=Size,y=ManureLevel), data=synth_agric_data_complete[id_arch,])
-#' p <- p + geom_point(aes(colour=Site),pch=20, position="jitter")
-#' p
-#'
-#' # HM model #
-#' # Relation between Rainfall and normd15N
-#' # (assuming no missing data)
-#' p <- ggplot( aes(x=Rainfall,y=normd15N), data=synth_agric_data_complete)
-#' p <- p + geom_point(aes(colour=ManureLevel), pch=20, size=3, alpha=0.7)
-#' p
-#' # (assuming missing data)
-#' p <- ggplot( aes(x=Rainfall,y=normd15N), data=synth_agric_data)
-#' p <- p + geom_point(aes(colour=ManureLevel), pch=20, size=3, alpha=0.7)
-#' p
+#' @import magrittr
 #'
 #' @importFrom reshape melt
+#' @importFrom stats rnorm runif
 #'
 #' @export
 #'
@@ -95,35 +47,35 @@ get_synth_agric_model <-function( theta=NULL,
 
   # on.exit(browser())
   # Loading real data
-  
+
   synth_agric_data <- get_agricurb_data( arc_datasets=arc_datasets,
                                          vars_log = vars_log,
                                          vars_sqrt = vars_sqrt,
                                          vars_scale_int_0_1=vars_scale_int_0_1,
                                          vars_scale_mean_0_var_1=vars_scale_mean_0_var_1 )
-  
+
   # number of observations
   n_obs <- nrow(synth_agric_data)
 
   # modern data rows
   id_arch <- synth_agric_data$dataset!="modern"
-  
+
   if(covariates=="nice") {
     # Relation between Site and Size in true data
     synth_agric_data %>%
       dplyr::filter(dataset!="modern") %>%
       ggplot() +
       geom_point(aes(x=Site,y=Size))
-    
+
     synth_agric_data %>%
       dplyr::filter(dataset=="modern") %>%
       ggplot() +
       geom_point(aes(x=Site,y=Rainfall))
-    
-    synth_agric_data[id_arch,"Size"] <- rnorm( sum(id_arch) )
-    synth_agric_data[,"Rainfall"] <- rnorm( nrow(synth_agric_data) )
+
+    synth_agric_data[id_arch,"Size"] <- stats::rnorm( sum(id_arch) )
+    synth_agric_data[,"Rainfall"] <- stats::rnorm( nrow(synth_agric_data) )
   }
-  
+
   # indicator of variance offset
   synth_agric_data$ind_v <- NA
   synth_agric_data[synth_agric_data$Category=="wheat","ind_v"] <- 1
@@ -146,24 +98,24 @@ get_synth_agric_model <-function( theta=NULL,
                     "v", # HM variance offset for ind_v rows
                     "sigma_hm_eta", # variance of random effects for Site in the HM model
                     paste("eta_hm_",Sites,sep="") ) # random effects for Site in the HM model
-  
+
   # Load default parameter values
   theta_default <- aistats2020smi::theta_agric_model_example
-  
+
   if( !is.null(theta) ) {
     theta_default[names(theta)] <- theta
     theta = theta_default
   }
-  
+
   if( !all( is.element(theta_names,names(theta)) ) ){
     stop("theta is not correctly specified")
   }
-  
+
   if(covariates=="true") {
     # Imputing missing rainfall
-    synth_agric_data[is.na(synth_agric_data$Rainfall),"Rainfall"] <- apply( synth_agric_data[is.na(synth_agric_data$Rainfall),c("Rainfall_min","Rainfall_max")],1,function(x){ runif(1,as.numeric(x)[1],as.numeric(x)[2]) })
+    synth_agric_data[is.na(synth_agric_data$Rainfall),"Rainfall"] <- apply( synth_agric_data[is.na(synth_agric_data$Rainfall),c("Rainfall_min","Rainfall_max")],1,function(x){ stats::runif(1,as.numeric(x)[1],as.numeric(x)[2]) })
   }
-  
+
   ##### Response #####
 
   ### PO1 ###
@@ -187,7 +139,7 @@ get_synth_agric_model <-function( theta=NULL,
     }
   }
   rm(X_aux,Z_aux)
-  
+
   ManureLevel_probs_allobs <- matrix(NA,n_obs,k.M)
   ManureLevel_probs_allobs[!id_arch,] <- categ_to_dummie(match(synth_agric_data[!id_arch,"ManureLevel"],ManureLevels),1:k.M)
   ManureLevel_probs_allobs[id_arch,] <- ManureLevel_probs
@@ -211,7 +163,7 @@ get_synth_agric_model <-function( theta=NULL,
   Z_aux <- categ_to_dummie(match(synth_agric_data[,"Site"],Sites),1:n_Site)
   #X_aux <- model.matrix(~Rainfall+ManureLevel,data=synth_agric_data)
   #Z_aux <- model.matrix(~-1+Site,data=synth_agric_data)
-  
+
   synth_agric_data$normd15N <- NA
   #synth_agric_data$normd15N_exp <- X_aux%*%t(theta[1,paste("beta_hm_",1:(1+1+(k.M-1)),sep=""),drop=F]) + Z_aux%*%t(theta[1,paste("eta_hm_",Sites,sep=""),drop=F])
   synth_agric_data$normd15N_exp <- cbind(X_aux,Z_aux) %*% matrix( theta[c(paste("beta_hm_",1:(1+1+(k.M-1)),sep=""),paste("eta_hm_",Sites,sep=""))], ncol=1 )
@@ -220,12 +172,12 @@ get_synth_agric_model <-function( theta=NULL,
 
   # sum(is.na(synth_agric_data$normd15N_exp))
 
-  synth_agric_data[synth_agric_data$ind_v==0,"normd15N"] <- rnorm( n=sum(synth_agric_data$ind_v==0,na.rm=T),
-                                                                     mean=synth_agric_data[synth_agric_data$ind_v==0,"normd15N_exp"],
-                                                                     sd=theta["sigma_hm"] )
-  synth_agric_data[synth_agric_data$ind_v==1,"normd15N"] <- rnorm( n=sum(synth_agric_data$ind_v==1,na.rm=T),
-                                                                     mean=synth_agric_data[synth_agric_data$ind_v==1,"normd15N_exp"],
-                                                                     sd=sqrt(theta["v"]) * theta["sigma_hm"] )
+  synth_agric_data[synth_agric_data$ind_v==0,"normd15N"] <- stats::rnorm( n=sum(synth_agric_data$ind_v==0,na.rm=T),
+                                                                          mean=synth_agric_data[synth_agric_data$ind_v==0,"normd15N_exp"],
+                                                                          sd=theta["sigma_hm"] )
+  synth_agric_data[synth_agric_data$ind_v==1,"normd15N"] <- stats::rnorm( n=sum(synth_agric_data$ind_v==1,na.rm=T),
+                                                                          mean=synth_agric_data[synth_agric_data$ind_v==1,"normd15N_exp"],
+                                                                          sd=sqrt(theta["v"]) * theta["sigma_hm"] )
 
 
   synth_agric_data <- synth_agric_data[,c("dataset","Site","Size","ManureLevel","Rainfall","Rainfall_min","Rainfall_max","Category","normd15N")]
