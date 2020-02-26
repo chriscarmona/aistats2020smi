@@ -1,0 +1,787 @@
+% !Rnw weave = Sweave
+% \VignetteEngine{utils::Sweave}
+% \VignetteIndexEntry{ Carmona and Nicholls (2020). Semi-Modular Inference. }
+% \VignetteDepends{ magrittr, ggplot2, ggridges, dplyr, tidyr, foreach, doParallel, doRNG, cowplot, abind, mvtnorm }
+% \VignetteKeyword{AISTATS}
+% \VignetteKeyword{SMI}
+
+\documentclass[twoside]{article}
+
+\usepackage[accepted]{aistats2020}
+
+\special{papersize = 8.5in, 11in}
+\setlength{\pdfpageheight}{11in}
+\setlength{\pdfpagewidth}{8.5in}
+
+\input{preamble}
+
+% If you use natbib package, activate the following three lines:
+% \usepackage[round]{natbib}
+\renewcommand{\bibname}{References}
+\renewcommand{\bibsection}{\subsubsection*{\bibname}}
+
+\bibliographystyle{apalike}
+
+<<init_chunk, eval=TRUE, echo=FALSE>>=
+rm(list = ls())
+options(scipen=999, stringsAsFactors=FALSE)
+set.seed(0)
+
+# Indicates if the MCMC will be computed (TRUE), or loaded from previously computed results (FALSE)
+compute_mcmc = FALSE
+
+# loading required packages #
+req.pck <- c( "aistats2020smi", "magrittr", "ggplot2", "dplyr", "tidyr",
+              "foreach", "doParallel", "doRNG", "cowplot",
+              "abind","mvtnorm" )
+req.pck <- sapply(X=req.pck,FUN=require,character.only=T)
+if(!all(req.pck)) {
+  sapply(X=req.pck[!req.pck],FUN=install.packages,character.only=T);
+  sapply(X=req.pck,FUN=require,character.only=T)
+}
+
+# # Parallel processing
+# parallel_comp = TRUE
+# if(parallel_comp){
+#   n_cores = 25
+#   options(cores=n_cores)
+#   doParallel::registerDoParallel()
+#   getDoParWorkers()
+# }
+
+# auxilliar functions used in foreach loops #
+lrcomb <- function(...) { mapply('rbind', ..., SIMPLIFY=FALSE) }
+lacomb <- function(...) { mapply('abind', ..., MoreArgs=list(along=3),SIMPLIFY=FALSE) }
+acomb <- function(...) {abind(..., along=3)}
+
+@
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+\runningtitle{Semi-Modular Inference}
+
+\runningauthor{Carmona and Nicholls}
+
+\twocolumn[
+
+\aistatstitle{Semi-Modular Inference: enhanced learning in multi-modular models by tempering the influence of components}
+
+\aistatsauthor{
+Chris U. Carmona \\
+\And
+Geoff K. Nicholls \\
+}
+
+\aistatsaddress{ Department of Statistics\\
+University of Oxford\\
+Oxford, U \\
+\texttt{carmona@stats.ox.ac.uk}\\
+\And
+Department of Statistics\\
+University of Oxford\\
+Oxford, UK \\
+\texttt{nicholls@stats.ox.ac.uk}\\
+}
+]
+
+\begin{abstract}
+Bayesian statistical inference looses predictive optimality when generative models are misspecified.
+
+Working within an existing coherent loss-based generalisation of Bayesian inference, we show existing Modular/Cut-model inference is coherent, and write down a new family of \emph{Semi-Modular Inference (SMI)} schemes, indexed by an influence parameter, with Bayesian inference and Cut-models as special cases. We give a meta-learning criterion and estimation procedure to choose the inference scheme. This returns Bayesian inference when there is no misspecification.
+
+The framework applies naturally to Multi-modular models. Cut-model inference allows directed information flow from well-specified modules to misspecified modules, but not vice versa. An existing alternative power posterior method gives tunable but undirected control of information flow, improving prediction in some settings. In contrast, SMI allows \emph{tunable and directed} information flow between modules.
+
+We illustrate our methods on two standard test cases from the literature and a motivating archaeological data set.
+\end{abstract}
+
+\section{Introduction} \label{sec:intro}
+
+Consider statistical inference in a multi-modular setting. This is the situation where the model for the available data is assembled from several component \emph{modules}. Each module describes a probabilistic relation between observable variables (data) and unknown quantities (parameters, latent variables, missing data). Modules may share parameters, missing data and other latent variables. Figure~\ref{fig:toy_multimodular_model} illustrates a simple two-module model with a shared parameter $\varphi$ (ignoring the dashed line for now, which will be explained in Sec.~\ref{sec:cut_models}). The first module has data $Z$ and one parameter, $\varphi$, while the second module has data $Y$ and two parameters, $\theta$ and $\varphi$.
+
+\begin{figure}[!ht]
+  \begin{center}
+  \begin{tikzpicture}
+      % Nodes
+      \node (Z) [data] {$Z$};
+      \node (Y) [data, right=of Z, xshift=0.5cm] {$Y$};
+      \node (phi) [param, below=of Z] {$\varphi$};
+      \node (theta) [param, below=of Y] {$\theta$};
+      % Edges
+      \edge {phi} {Z,Y};
+      \edge {theta} {Y};
+      % SMI line
+      \draw[dashed,red,line width=0.5mm] (0.85,0) to (0.85,-1.25);
+      % Text denoting modules
+      \node[text width=3cm] at (0.5,1) {Module 1};
+      \node[text width=3cm] at (2.75,1) {Module 2};
+  \end{tikzpicture}
+  \end{center}
+  \caption{Graphical representation of a simple multi-modular model.}
+  \label{fig:toy_multimodular_model}
+\end{figure}
+
+In conventional Bayesian inference, parameters are jointly informed by the data and model assumptions shared across the modules. As a consequence, large-scale multi-modular analyses are particularly susceptible to problems arising from model misspecification, as any bad module may distort inference in the model as a whole \citep{Liu2009}.
+
+This drawback has motivated alternative inferential approaches that modify conventional Bayesian learning in order to regulate feedback between modules. \emph{Modular} inference \citep{Liu2009, Jacob2017b} also known as a \emph{Cut-model} inference \citep{Spiegelhalter2014, Plummer2015} completely eliminates the contribution from some modules to the posterior distribution of parameters in other modules (see Section~\ref{sec:cut_models}).
+However, we may do better to moderate, rather than eliminate, the influence of misspecified modules.
+
+We give a new \emph{Semi-Modular Inference (\textbf{SMI})} which \emph{smoothly} regulates the influence of modules on the overall inference. The procedure effectively expands the space of \emph{candidate distributions} \footnote{following \cite{Jacob2017b}, we refer to any distribution representing beliefs on parameters $\theta$ (or $\varphi$, or both) as a \emph{candidate distribution} for the parameters} in such a way that Bayesian inference and Cut-model inference are particular cases.
+
+When it comes to expanding the inference framework, an ``anything goes'' approach is clearly suspect. We stay within the class of inference schemes defined by \cite{Bissiri2016}. Those authors define and characterise coherent loss-based inference and note that Bayesian inference and the power posterior are coherent. We set out existing Cut-model and Power-posterior inference in Sections~\ref{sec:cut_models} and~\ref{sec:power_lk}, introduce SMI in Section~\ref{sec:smi} and then describe the encompassing framework of \cite{Bissiri2016} in Section~\ref{sec:gen_inf}, where we show that SMI and Cut-model inference are coherent.
+
+The SMI posterior interpolates candidate distributions between the conventional Bayesian posterior and the Cut-model posterior. Candidate distributions are indexed by a continuous \emph{degree of influence} parameter $\eta$. This controls the contribution of a module to the candidate distribution. When $\eta$=0 the candidate distribution is the Cut-model posterior and when $\eta$=1 it is the Bayesian posterior. The SMI posterior is not a scheme for model elaboration with an extra parameter. SMI-based inference with any value of $\eta$ other than $\eta=1$ is not Bayesian inference.
+
+In Section~\ref{sec:data_analyses}, we apply SMI to model-based inference for simulated and real-world datasets and evaluate its performance. It is easy to understand why it outperforms Bayesian and Modular inference in these examples. The supplementary material provides detailed proofs and additional numerical experiments.
+
+\section{Background methods}\label{sec:background}
+
+\subsection{Modular Inference: cut model}
+\label{sec:cut_models}
+
+The Cut model is an alternative to Bayesian inference designed to remove unwanted feedback from poorly specified modules. The OpenBUGS manual \citep{Spiegelhalter2014} describes the cut function with the words ``The cut function acts as a kind of valve in the graph: prior information is allowed to flow downwards through the cut, but likelihood information is prevented from flowing upwards''. Cut model inference is a form of Bayesian multiple imputation.
+
+Consider again the two-module configuration of Figure~\ref{fig:toy_multimodular_model}. In standard joint or ``full'' Bayesian inference, information from the two modules informs every parameter, so in particular the values of $Y$ will in general influence the posterior distribution of $\varphi$. The posterior distribution of $(\varphi,\theta)$ in Bayesian inference is
+\begin{equation} \label{eq:full_01}
+p(\varphi,\theta \mid Z,Y) = p(\varphi \mid Z,Y) p( \theta \mid Y, \varphi ) .
+\end{equation}
+The marginal distribution of $\varphi$ depends on $Y$.
+
+Now, suppose that for some reason (usually because we suspect some model misspecification) we want the parameter $\varphi$ to learn only from module 1, \emph{cutting} the influence from module 2 on $\varphi$. The cut is represented in Figure~\ref{fig:toy_multimodular_model} by a dashed line on the edge from $\varphi$ to $Y$; it denotes an inference structure in which $\varphi$ influences $Y$ but not vice versa (following \cite{Lunn2009}).
+
+Under this modified scheme, the Cut-model ``posterior'' for  $(\varphi,\theta)$ is
+\begin{equation} \label{eq:cut_01}
+p_{cut}(\varphi,\theta \mid Z,Y) = p(\varphi \mid Z) p(\theta \mid Y,\varphi).
+\end{equation}
+Notice that the marginal distribution of $\varphi$ no longer depends on $Y$.
+
+Cut-model inference is not Bayesian inference, though it is closely related. Several justifications to favour the adoption of modular inference over fully Bayesian approach have been discussed in the literature. These include: simplification of inference \citep{Cox1975}, prevent unwanted feedback from suspect models \citep{Lunn2009}, improved MCMC mixing \citep{Plummer2015}, reduction of MSE in estimates \citep{Liu2009}, increased predictive performance \citep{Jacob2017b}, the convenience in some settings of a sequential analysis in which the data $Z$ is not shared to the analyst carrying out inference for $\theta$, and the identification of Cut-model inference with Bayesian multiple imputation \citep{Lunn2009, Styring2017}.
+
+\subsection{Power posterior} \label{sec:power_lk}
+
+In the power posterior we raise the likelihood to a power, seeking to improve robustness under model misspecification (\cite{Walker2001, Bissiri2016, Holmes2017, Grunwald2017, Miller2018a}).
+
+Consider independent data $Y=(Y_1,\ldots,Y_n)$ generated from an unknown true distribution $f^*(Y)$. Assume we have a data model $f(Y|\theta)$ and a prior distribution $p(\theta)$. For a fixed $\eta \in \mathbb{R}$, we define the \emph{$\eta$-powered posterior} $p_{pow, \eta}(\theta|x)$ as
+\begin{equation} \label{eq:power_lik_01}
+p_{pow, \eta}(\theta|Y) = \frac{ f(Y|\theta)^\eta p(\theta) }{p_{\eta}(Y)} \\
+\end{equation}
+with $p_{\eta}(Y) = \int f(Y|\theta)^\eta p(\theta) d\theta$ the \emph{powered} normalising constant.
+
+The new parameter $\eta$ is called the \emph{learning rate}, following \cite{Grunwald2012}. The learning rate amounts to a calibration of the prior relative to the the data; if $\eta \in [0,1]$ the prior is given more influence and the data less. When $\eta>1$ the data is given more prominence, and in the extreme case when $\eta$ is very large the posterior accumulates around the maximum likelihood estimate for the model. For the misspecification we encounter, we tend to be interested in the case $\eta \in [0,1]$.
+
+A key point emphasised by \cite{Grunwald2017} among others is that this is not simply model elaboration. We do not put a prior on $\eta$ and learn it in the usual Bayesian way. Roughly speaking the learning rate ``corrects'' Bayesian inference and should not be chosen using Bayesian inference but according to other ``external'' criteria, for example, a predictive loss on test data. \cite{Grunwald2012} and \cite{Grunwald2017} propose the \emph{SafeBayes} algorithm to find the optimal learning rate. In that work, the learning rate $\eta$ is chosen to maximise the “sequentially randomised” Bayesian marginal log-likelihood. This can be interpreted as measure of predictive accuracy. In contrast \cite{Holmes2017} choose the learning rate by matching the prior expected gain in information between the prior and posterior, this gain in information is quantified by the expected divergence in Fisher information.
+
+\section{Semi-Modular Inference: smoothly regulating feedback between modules.} \label{sec:smi}
+
+In this section, we define \textbf{\emph{Semi-Modular Inference (SMI)}}, a modification of Bayesian inference in multi-modular settings which allows us to adjust the flow of information between data and parameters in separate modules.
+
+Recall the two-module setting in Figure~\ref{fig:toy_multimodular_model}. Suppose we are in a situation where we want to \emph{partially cut} the influence from module 2 into the parameter $\varphi$, that is, we want the data from module 1 to dominate in inference for $\varphi$ but we also wish to preserve some of the joint structure that the full model provides.
+
+We set up a two stage analysis resembling Cut-model analysis, but using a power posterior in the first stage. First, we update our beliefs about $\varphi$ using a powered likelihood, with a power $\eta \in [0,1]$ on module 2. This down-weights its influence compared to module 1. The idea here is to use the power-posterior approach to get the best possible Bayesian multiple imputation of $\varphi$ at the expense of $\theta$. In the second stage, we re-learn our beliefs on $\theta$ conditional on the learnt distribution of $\varphi$ and recycling the data from module 2. The \emph{degree of influence}, $\eta$, controls the contribution of the suspect module in the inference.
+
+\subsection{SMI distributions} \label{sec:smi_def}
+
+Let $p(Z | \varphi)$ and $p(Y | \varphi,\theta)$ denote the observation models for the two modules. We introduce an auxiliary parameter $\tilde\theta$, expanding the model parameters from $(\varphi,\theta)$ to $(\varphi,\theta,\tilde\theta)$.
+
+We define the \textbf{$\eta$-smi posterior} as
+\begin{equation} \label{eq:smi_02}
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta|Z,Y) = p_{pow,\eta}(\varphi,\tilde\theta|Z,Y) p(\theta|Y,\varphi)
+\end{equation}
+where $p_{pow,\eta}( \varphi , \tilde\theta \mid Z, Y )$ is the power posterior
+\begin{equation}
+  p_{pow,\eta}( \varphi , \tilde\theta \mid Z, Y ) \propto p(Z|\varphi) p( Y \mid \varphi, \tilde \theta )^\eta \;  p(\varphi,\tilde\theta).
+\end{equation}
+Expanding in terms of model elements (details in supplement),
+\begin{align*} \label{eq:smi_03}
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta|Z,Y) \propto & \; p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \; p(Y \mid \varphi, \theta ) \\ %[TODO - corrected tilde.theta to theta]
+ & \times\quad \frac{1}{ p(Y \mid \varphi) } \; p(\varphi, \theta, \tilde\theta),
+\end{align*}
+where $p(Y \mid \varphi) = \frac{1}{p(\varphi)} \int p(Y \mid \varphi, \theta ) \; p(\varphi, \theta) d\theta $.
+
+The $\eta$-smi posterior of the original parameters is
+\begin{equation}\label{eq:smi_marg}
+p_{smi,\eta}(\varphi,\theta|Z,Y)=\int p_{smi,\eta}(\varphi,\theta,\tilde\theta|Z,Y) d\tilde\theta.
+\end{equation}
+
+The posterior distribution $p_{smi,\eta}( \varphi,\theta | Z,Y )$ interpolates between the Bayesian posterior and the Cut model posterior.
+When $\eta=1$ the SMI posterior is Bayesian (Eq.~\ref{eq:full_01}),
+\begin{align*}
+p_{1-smi}(\varphi,\theta | Z,Y ) &= p( \varphi |Z,Y )p( \theta |Y, \varphi) \\
+&= p( \varphi,\theta |Z,Y ),
+\end{align*}
+whereas if $\eta=0$, the SMI posterior of $\varphi$ gives back the Cut model (Eq.~\ref{eq:cut_01}),
+\begin{align*}
+p_{0-smi}(\varphi,\theta | Z,Y ) &= p( \varphi | Z )p( \theta |Y, \varphi) \\
+&= p_{cut}( \varphi,\theta |Z,Y ).
+\end{align*}
+
+Semi-modular inference is defined for a fixed degree of influence $\eta \in [0,1]$. Each value of $\eta$ yields a different \emph{candidate distribution}, $p_{smi,\eta}$, which we loosely call the SMI posterior, representing posterior beliefs on $(\varphi,\theta)$. Natural questions now are, how to choose in a principled manner the ``best'' degree of influence, and how and why does SMI help? The answer to the latter question is in a sense straightforward. If a generalised inference scheme achieves a better score, according to some agreed external criterion, we should use it, and not otherwise. This approach is taken in \cite{Jacob2017b}. We answer the first question in the next section.
+
+
+\section{Analysis with (Semi-)Modular Inference} \label{sec:smi_considerations}
+
+In this section we show that inference with the SMI posterior distributions is a valid inference scheme and give an MCMC algorithm targeting $p_{smi,\eta}(\varphi,\theta|Z,Y)$.
+%[TODO - minor wording change to above]
+
+\subsection{Coherence of (Semi-)Modular Inference} \label{sec:gen_inf}
+
+We apply the general framework for updating belief distributions in \cite{Bissiri2016} to show that the SMI posterior - and hence also the cut posterior - are \emph{valid} and \emph{coherent} updates of beliefs.
+This framework is based on a loss function $l(\theta;y)$ connecting information in the data to the parameters of interest. The log-likelihood is one such loss, but \cite{Bissiri2016} give examples where other losses may be relevant, and Cut-models and SMI prove to be further examples.
+
+\cite{Bissiri2016} characterise a valid belief update. They list a number of conditions, which they take as axiomatic requirements. We verify that our SMI-update does not violate these conditions in the supplement. The most demanding of these conditions, in our setting, is the coherence condition.
+%[TODO - added sentences above]
+
+In \emph{Coherent} inference we reach the same posterior distribution, whether we update belief using all data simultaneously or update belief taking the data sequentially in independent blocks. In our two-module setting, this applies in several ways: we can observe responses from different modules one after the other (e.g. first $Z$, and then $Y$); we can observe sequential data fragments within the same module (e.g. first $Z_1$, and then $Z_2$, with $Z=(Z_1,Z_2)$); any mixture of these.
+
+The generalised update of belief in \cite{Bissiri2016} follows a decision theoretic approach. In single module notation, the generalised posterior distribution $p_{l}$ (arising from the loss $l(\theta;y)$), is a probability measure that minimises a cumulative loss function, defined below, on the space of $\theta$,
+\begin{equation*}
+p_{l(\cdot)}(\theta \mid Y) = \argmin_{\nu} L_{\rho}(\nu;p_0,Y).
+\end{equation*}
+%[TODO - added a subscript "{l(\cdot)}" to p]
+%[TODO - again this is stated for a single module - may need to give in our notation, or say that we quote BHW16 who give it for a single module]
+
+The cumulative loss function, $L_{\rho}(\nu;p,Y)$ balances the expected loss in the fit to data and the Kullback-Leibler divergence from the posterior to the prior distribution $p_0$, and is defined by
+\begin{equation*}
+L_{\rho}(\nu;p_0,Y)=\int l_{\rho}(\theta,Y) \nu(d\theta) + d_{KL}(\nu,p_0).
+\end{equation*}
+\cite{Bissiri2016} show that the optimal, valid and coherent update of beliefs from prior to posterior is given by
+\begin{equation*}
+p_{l(\cdot)}(\theta \mid Y ) \propto \exp\{-l( \theta ; Y ) \} p(\theta)
+\end{equation*}
+%[TODO - they show that if the update is coherent the KL divergence must appear, right?, and then show the formula above]
+
+The canonical case in the single-module setting is the logarithmic loss function $ l(\theta;Y) = - \log f(Y \mid \theta) $, which yields the conventional Bayesian update of beliefs given by the posterior distribution. The power posterior is obtained by taking the loss function $l_{\rho-pow}(\theta;Y) = - \rho \log f(Y \mid \theta)$.
+%[TODO - minor wording changes to par above]
+
+In the Supplementary material we prove that, for the model in Fig.~\ref{fig:toy_multimodular_model}, the loss function which yields the Cut model posterior is
+\begin{align} \label{eq:cut_loss}
+  l_{cut}( (\varphi,\theta) ; (Z,Y) ) =& - \log p(Z \mid \varphi) \\
+  &-\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi), \nonumber
+\end{align}
+and the loss function yielding the SMI posterior is
+\begin{align} \label{eq:smi_loss}
+  l_{smi,\eta}( (\varphi,\theta,\tilde\theta) ;& (Z,Y) ) = - \log p(Z \mid \varphi) \\ & -\eta \log p(Y \mid \varphi,\tilde\theta) \nonumber \\
+  &-\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi). \nonumber
+\end{align}
+The $p( Y \mid \varphi )$ terms in each expression are the loss-function expression of the idea of cutting feedback from $Y$ to $\varphi$.
+%[TODO - the cut model loss function is not a proper loss function, and the SMI model loss function becomes proper when eta=1 (? is that right ?). This would not make sense in a well-specified model setting, but in a misspecified setting there is no parameter choice that recovers the true observation model.]
+%[TODO - it would be good to give the loss function for normal Bayes in the two module case - perhaps update the previous paragraph to the two-module case]
+
+We prove that both Cut-model inference and SMI are coherent when we update using the correct associated loss function given above. Detailed proofs are given in the supplementary material.
+%[TODO - cut sentence about not being coherent for wrong loss]
+
+\subsection{Targeting the modular posterior} \label{sec:cut_mcmc}
+
+\cite{Plummer2015} and \cite{Jacob2017b} explain that an MCMC algorithm that correctly targets the cut distribution cannot usually be implemented, due to the presence of the intractable normalising constant $p( Y \mid \varphi )$. A SMI sampler faces the same issue.
+
+In order to sample the SMI-posterior in a single MCMC run we need, refering to Eq.~\ref{eq:smi_02}, a standard MCMC sampler for $p_{\eta-pow}(\varphi, \tilde\theta \mid Z, Y)$ and an \emph{exact} sampler for $p( \theta \mid Y,\varphi )$.
+It is straightforward to check that the transition kernel given by a two-stage update using these two conditional distributions satisfies detailed balance. A proof is given in the supplement.
+
+However, exact simulation of $p( \theta \mid Y,\varphi )$ may be impracticable. In practice, there are currently three options, nested MCMC, unbiased MCMC via couplings \citep{Jacob2017}, and tempered transitions \citep{Plummer2015}.
+
+\textit{Unbiased MCMC via couplings} simulates samples unbiased in expectation from the Cut-model posterior. The approach uses coupled pairs of Markov Chains sharing a common transition kernel, which almost-surely meet at some finite time $\tau \geq 1$ and stay together thereafter.
+The same approach would work for the SMI posterior, though we have not implemented this for SMI.
+
+In our examples we use \textit{nested MCMC}, described in Algorithm~\ref{alg:smi_nested_mcmc}: sample $N_1$ draws from $p_{\eta-pow}(\varphi, \tilde\theta \mid Z, Y)$; for each sampled value of $\varphi$, run a sub-chain targeting $p(\theta \mid \varphi,Z)$ for $N_2$ steps, where $N_2$ is large enough to avoid initialisation bias; keep only the last sampled value in this sub-chain. The resulting joint samples $(\varphi,\tilde\theta,\theta)$ are approximately distributed according to the SMI posterior. We typically ignore the output for $\tilde\theta$ as we target the marginal in Eq.~\ref{eq:smi_marg}. The validity of this algorithm relies on a double asymptotic regime in $N_1$ and $N_2$ \citep{Jacob2017b}.
+This works well, with standard MCMC convergence checks, if convergence of the MCMC targeting $p(\theta \mid \varphi,Z)$ is rapid.
+
+\begin{algorithm}[tb]
+\caption{Nested MCMC for SMI posterior Eq.~\ref{eq:smi_02}} \label{alg:smi_nested_mcmc}
+\begin{algorithmic}
+%\STATE This algorithm assumes that we want to partially cut the influence of module 2 (with response $Y$) into $\varphi$.
+\STATE \textbf{Input:} influence $\eta\in[0,1]$, Data $(Z,Y)=\{ (Z_i,Y_i) \}_{i=1}^{n}$; observational models $f(Z \mid  \varphi )$ and $f(Y \mid \varphi,\theta)$; prior $p(\varphi,\theta)$; run-lengths $N_1$ and $N_2$.
+
+\STATE \textbf{Output:} Samples $\{(\theta^{(s)}, \varphi^{(s)}) \}_{s=1}^{N_1}$ distributed approximately according to the SMI posterior distribution $p_{smi,\eta}(\varphi,\theta \mid Z,Y )$ with influence parameter $\eta$.
+   %\Procedure{Bayesian multiple imputation}{}
+   \FOR{$s = 1,\ldots,N_1$}
+		\STATE Sample $(\tilde\theta^{(s)}, \varphi^{(s)}) \sim p_{\eta-pow}(\varphi,\tilde\theta|Z,Y)$, using any standard sampler.
+   \ENDFOR
+   \STATE Let $\{\varphi^{(s)}\}_{s=1}^{N_1}$ be samples after burn-in and thinning
+   \FOR{$s=1,\ldots,N_1$}
+      \FOR{$r=1,\ldots,N_2$}
+         \STATE Sample $(\theta^{(s,r)}) \sim p( \theta \mid Y, \varphi^{(s)} )$, using any standard sampler.
+      \ENDFOR
+   \STATE Let $\theta^{(s)}=\theta^{(s,N_2)}$ (final state)
+\ENDFOR
+   \RETURN $\{(\theta^{(s)}, \varphi^{(s)}) \}_{s=1}^{N_1}$
+\end{algorithmic}
+\end{algorithm}
+
+%A second approach is the \textit{Tempered cut} algorithm, proposed by \cite{Plummer2015}. The method consists of tempered updates between $\varphi_{t}$ and $\varphi_{t+1}$, moving in a sequence of $m$ updates along a linear path and only keeping the last update.
+
+\subsection{Choosing the influence parameter} \label{sec:opt_eta}
+
+We work in a $\mathcal{M}$-open setting \citep{Bernardo2000}, as tackling model misspecification is our motivation to explore Semi-Modular Inference.
+Conventional Bayesian inference is optimal for prediction (for the objective defined below) under an idealised scenario of correct model specification, full availability of data, and no computational restrictions. In the $\mathcal{M}$-open setting the conventional posterior may be outperformed by another candidate distribution \citep{Jacob2017b}.
+
+The class of SMI candidate posteriors is indexed by $\eta$, so we need to give a procedure to choose a belief update operation from the set of candidate models $\mathcal{M} = \{ \pi_{smi,\eta} ; \eta \in [0,1] \}$. Following \citep{Bernardo2000}, we should determine $\eta$ on the basis of expected utility, provided some utility function.
+
+We consider \emph{out-of-sample predictive accuracy} of the model as our utility function. Our criterion is the \textit{expected log pointwise predictive density}, \textbf{elpd} \citep{Vehtari2016}.
+\begin{align} \label{eq:elpd}
+  elpd = \int\int &p^*(z,y) \cdot \nonumber \\
+  &\log p_{smi-\eta}( z, y \mid Z,Y) dz dy
+\end{align}
+where $p^*$ is the distribution representing the true data-generating process and
+\begin{align*}
+  p_{smi-\eta}(z,y \mid Z,Y)=\int\int & p(z,y \mid \varphi, \theta) \cdot \\
+  & p_{smi-\eta}(\varphi,\theta \mid Y,Z)\, d\varphi\,d\theta
+\end{align*}
+is a candidate posterior predictive distribution, indexed by $\eta$.
+%QUESTION - if there is no model mispec then is this maxed by $\eta=1$?
+We expect this procedure to yield $\eta\simeq 1$ when there is no model mispecification and the data are informative of parameters. The $elpd$ is a KL-divergence, up to a constant not depending on $\eta$. If the posterior distribution of the parameters concentrates on the true values, then $p_{smi-\eta}( z,y \mid Z,Y)$ coincides with $p^*(z,y)$ when $\eta\simeq 1$ and this choice will minimise the divergence, and maximise the $elpd$. We found in our experiments that this did occur.
+
+In practice, $p^*$ is unknown, so we use cross-validation and the WAIC \citep{Watanabe2009} to approximate $elpd$ on a grid of $J$ values of $\eta$. We tried both $elpd$-estimators as a check, and found good agreement. Leave-one-out cross-validation is natural but expensive. Other estimators are available \cite{Vehtari2016} and we are exploring these. We take the value, $\eta=\eta^*$ say, which maximizes our chosen estimate.
+
+The overall SMI-cost, $W_{smi}$ say, of simulating $p_{smi,\eta}(\varphi,\tilde\theta,\theta \mid Y,Z)$ at $J$ values of $\eta$ and determining $\eta^*$, can be related to the cost, $W_{bm}$ say, of doing regular Bayes-MCMC on the original problem. The $J$ MCMC runs parallelise essentially perfectly across cores. If one has available $J$ cores then an overall SMI-cost $W_{smi} \approx 10W_{bm} $ should typically by achieveable.
+
+This is justified in the Supplementary Material.
+
+\subsection{SMI and the power likelihood}
+SMI is a two-stage procedure, fitting a power likelihood for $\phi$ and $\tilde\theta$, and then recalibrating $\theta$ conditional on $\phi$ in a Cut-model step. Does the second stage improve the inference or we could simply use a power posterior and stick with $\tilde\theta$?
+This depends on the purpose of the inference. If the interest lies purely in estimation of $\phi$, we should stay with the power posterior, as the second stage has no effect on the candidate posterior for $\varphi$. However, if we are interested in estimating $\theta$ or in prediction of $Z$ or $Y$, the best SMI candidate posterior may (and often did in experiment) have a bigger $elpd$ and be selected over the power posterior. In Sections~\ref{sec:biased_data} and~\ref{sec:agric_analysis} we give examples where SMI improves prediction (both sections) and estimation (Sec.~\ref{sec:biased_data} only since we can only test this with synthetic data).
+
+\subsection{Bayesian multiple imputation}
+
+Missing data is common in statistical practice. Under the Bayesian paradigm, this issue can be handled naturally, treating missing observations as unknown quantities that are inferred jointly with the unknown parameters in the model.
+
+In some circumstances there is an advantage in adopting different models for imputation and analysis, a situation known as \textit{uncongeniality} \citep{Meng1994,Xie2016a,Little2002}.
+
+Cut-model inference is Bayesian multiple imputation, since it sequentially updates the imputed parameter $\varphi$ and then the analysis parameter $\theta$ \citep{Lunn2009, Styring2017}.
+Since SMI reduces to the Cut-model at $\eta=0$, we improve on multiple imputation (according to our criterion) if our procedure gives $\eta>0$.
+Our analysis in Section~\ref{sec:agric_analysis} with an archaeological data set is an example where this occurs.
+
+
+\section{Examples} \label{sec:data_analyses}
+
+Here we present three reproducible examples. In two of these examples candidate distributions made available by Semi-Modular Inference outperform Cut-model inference and conventional Bayesian inference. In the last, the Cut-model, or Bayesian inference are selected. Recall however that these are special cases of SMI, so the extended inference is doing its job and returning existing inference schemes when they have good predictive performance.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Simulation study: Biased data} \label{sec:biased_data}
+
+This is a simple synthetic example in which the source of the ``misspecification'' is a poorly chosen prior. Suppose we have two datasets informing an unknown parameter $\varphi$. The first is a ``reliable'' small sample $Z=(Z_1,\ldots,Z_n),\ Z_i\sim N( \varphi, \sigma_z^2 )$, iid for $i=1,...,n$ distribution, with $\sigma_z$ known; the second is a larger sample $Y=(Y_1,\ldots,Y_m), Y_i\sim N( \varphi + \theta , \sigma_y^2 )$ iid for $i=1,...,m$, with $\sigma_y$ known. The ``bias'' $\theta$ is unknown.
+
+This model was used by \cite{Liu2009} and \cite{Jacob2017b} as an example where modular/Cut-model approaches do well compared to Bayesian inference. We show that Semi-Modular Inference outperforms these inference schemes (which are just special cases).
+
+In order to make our point we choose true parameter values in such a way that each dataset offers apparent advantages to estimate $\varphi$. One dataset is unbiased but has a small sample size, $n=25$, whereas the second has an unknown bias but more samples, $m=50$, and smaller variance. Suppose the true generative parameters are $\varphi^*=0$, $\theta^*=1$, and we know $\sigma_z = 2$ and $\sigma_y = 1$. Finally, we assign a constant prior for $\varphi$, while $\theta$ is subjectively assessed to have a $N(0, \sigma_{\theta}^2)$ prior. We are over-optimistic about the true size of the bias and set $\sigma_\theta=0.5$.
+
+<<biased_data_01, eval=TRUE, echo=FALSE>>=
+n=25 # Sample size for Z
+m=50 # Sample size for Y
+
+phi = 0
+theta = 1 # bias
+
+sigma_z = 2 # variance for Z
+sigma_y = 1 # variance for Y
+sigma_phi=Inf # Prior variance for phi
+sigma_theta=0.5 # Prior variance for eta
+
+param_names = c('phi','theta','theta_tilde')
+param_true = c(phi,theta,theta)
+
+# sequence of eta values in (0,1)
+eta_all = seq(0,1,0.01)
+
+# Average Mean Square Error #
+set.seed(123)
+# Compute Posterior mean and sd for each iteration
+n_iter = 10
+Z = matrix(rnorm( n=n*n_iter, mean=phi, sd=sigma_z),n_iter,n)
+Y = matrix(rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y ),n_iter,m)
+post_eta_all_iter = foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %:%
+  foreach(eta_i = seq_along(eta_all), .combine='lrcomb', .multicombine=TRUE) %dopar% {
+    # eta_i=1
+    posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    list( t(posterior[[1]]), diag(posterior[[2]]) )
+}
+# Compute MSE for each iteration
+param_true_array = aperm( array(param_true,dim=c(3,length(eta_all),n_iter)) , c(2,1,3) )
+MSE_all_iter = post_eta_all_iter[[2]] + (post_eta_all_iter[[1]]-param_true_array)^2
+
+# Average across iterations
+post_eta_all_average = list( apply(post_eta_all_iter[[1]],c(1,2),mean),
+                             apply(post_eta_all_iter[[2]],c(1,2),mean) + apply(post_eta_all_iter[[1]],c(1,2),var))
+MSE_average = apply(MSE_all_iter,c(1,2),mean)
+
+# ELPD approximation via Monte Carlo
+set.seed(123)
+n_new = 10
+
+# generate data from the ground-truth distribution
+Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
+Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
+
+log_pred_eta_all_iter = foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
+  foreach( eta_i = seq_along(eta_all), .combine=rbind ) %dopar% {
+    # iter_i=1
+    # new_i = 1
+    # eta_i=1
+    # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+    mvtnorm::dmvnorm( x=cbind(Z_new[iter_i,],Y_new[iter_i,]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
+}
+# average to get elpd
+elpd_eta_all = apply(log_pred_eta_all_iter,1,mean)
+
+
+# Plot ELPD and MSE
+aistats2020smi::set_ggtheme()
+elpd_eta_star = data.frame( eta = eta_all[which.max(elpd_eta_all)],
+                            elpd = max(elpd_eta_all) )
+curves_data = data.frame( eta=rep(eta_all,3),
+                          value=c(-elpd_eta_all,MSE_average[,1],MSE_average[,2]),
+                          stat=c(rep("-ELPD( Z, Y )",length(eta_all)),rep("MSE( phi )",length(eta_all)),rep("MSE( theta )",length(eta_all))) )
+labels_data = data.frame( label=c("A","B","C","D","E","F","G"),
+                          eta=c(eta_all[length(eta_all)],eta_all[1],eta_all[length(eta_all)],eta_all[1],elpd_eta_star[1,"eta"],eta_all[which.min(MSE_average[,1])],eta_all[which.min(MSE_average[,2])]),
+                          value=c(MSE_average[length(eta_all),1],MSE_average[1,1],MSE_average[length(eta_all),2],MSE_average[1,2],-elpd_eta_star[1,"elpd"],min(MSE_average[,1]),min(MSE_average[,2])),
+                          stat=c("MSE( phi )","MSE( phi )","MSE( theta )","MSE( theta )","-ELPD( Z, Y )","MSE( phi )","MSE( theta )")  )
+p_biased_data = curves_data %>%
+  ggplot( aes(x=eta,y=value) ) +
+  geom_line( col='red' ) +
+  facet_wrap( vars(stat), ncol=1, scales = "free_y" ) +
+  geom_vline( aes(xintercept=eta), col="purple", lty=2, data=elpd_eta_star ) +
+  geom_point( col="blue", pch=20, size=5,
+              data=labels_data ) +
+  geom_label( aes(label=label), size=5, hjust="inward", vjust="inward", label.padding=unit(0.1, "lines"),
+              data=labels_data ) +
+  theme( axis.title.y=element_blank() )
+ggsave( plot=p_biased_data,
+        filename="SMI_biased_elpd.pdf",
+        device="pdf", width=15,height=12, units="cm")
+@
+
+We can calculate the SMI posterior and predictive distributions for each $\eta\in[0,1]$ (included in the supplement). We can also calculate the mean square error for $\varphi$ and $\theta$, and the negative $elpd$ as measures of model performance for all $\eta\in[0,1]$. These metrics are displayed in Fig.~\ref{fig:sim_study_01_01}.
+
+For estimating $\varphi$, the conventional posterior (point A at $\eta=1$ and a large MSE) is clearly outperformed in MSE by a modular approach as noted in \cite{Liu2009} and \cite{Jacob2017b}. The same applies for estimating $\theta$ (point C at $\eta=1$).
+
+SMI offers new candidate distributions which \textit{significantly} outperform the full and the cut model options. We choose the optimal degree of influence $\eta$ by minimizing $-elpd$ (top graph, dotted vertical line). This is something we can compute without knowing the true parameter values. The chosen value of $\eta$ (at the dotted line) does not minimize the MSE of $\varphi$ or $\theta$ (points F,G) however its candidate distribution has a much lower MSE than that achieved by the the full and cut models.
+
+The supplement contains details of calculations of the functions plotted in Fig~\ref{fig:sim_study_01_01} and further analysis.
+
+\begin{figure}[!ht]
+\begin{center}
+   \includegraphics[width=0.48\textwidth]{SMI_biased_elpd}
+\end{center}
+   \caption[Simulation study 1: Biased data]{Model assessment for the biased data example. Top: $elpd$ function for new data $(Z_{new},Y_{new})$ under the SMI posterior with $\eta\in[0,1]$. Middle: MSE of estimate for $\varphi$. Bottom: MSE for $\theta$.}
+   \label{fig:sim_study_01_01}
+\end{figure}
+
+% \subsection{Experiments on Bayesian Multiple Imputation}\label{sec:bayes_impute}
+
+% (Comment on experiments using synthetic data which show that  missing data and model misspecification is bad for both the full and the cut model.)
+
+
+%%%%%%%%%%%
+
+\subsection{Agricultural practices in early civilizations} \label{sec:agric_analysis}
+
+<<agric_smi_mcmc_plot,eval=TRUE,echo=FALSE>>=
+plot_mcmc = TRUE
+if(plot_mcmc) {
+  # Setting nice ggplot theme settings
+  aistats2020smi::set_ggtheme()
+
+  ### SMI posterior ###
+  # Joy Division style #
+  # load( file="../data/agric_smi_post_all.rda" )
+  param_joy <- setdiff(colnames(aistats2020smi::agric_smi_post_all),c("arc_dataset","eta"))
+  param_i = "gamma_po_1"
+
+  p_post_joy = aistats2020smi::agric_smi_post_all %>%
+    select(c("arc_dataset","eta",param_i)) %>% #head()
+    'colnames<-'(value=c("arc_dataset","eta","value")) %>%
+    ggplot( aes(x=value,y=eta, group=eta, fill=arc_dataset) ) +
+    geom_vline(xintercept=0)+
+    ggridges::geom_density_ridges(scale = 4, alpha=0.9) +
+    scale_y_continuous(expand = c(0, 0)) +     # will generally have to set the `expand` option
+    scale_x_continuous(expand = c(0, 0)) +   # for both axes to remove unneeded padding
+    # coord_cartesian(clip = "off") + # to avoid clipping of the very top of the top ridgeline
+    coord_cartesian(xlim = c(-4,1)) +
+    # facet_wrap( ~arc_dataset, scales = "free_x" ) +
+    ggridges::theme_ridges() +
+    labs( y="eta", x=param_i ) +
+    theme(legend.position="none") # Remove legend
+  # print(p_post_joy)
+  ggsave( plot=p_post_joy,
+          filename=paste("agric_smi_post_",param_i,".pdf",sep=""),
+          device="pdf", width=12,height=8, units="cm")
+
+}
+@
+
+<<agric_smi_model_select_plot,eval=TRUE,echo=FALSE>>=
+# Select best eta
+if(TRUE){
+  # Loading elpd estimates for SMI posteriors
+  # load( file="../data/agric_smi_model_eval.rda" )
+
+  aux = aistats2020smi::agric_smi_model_eval %>%
+    dplyr::filter(stat=='elpd_waic') %>%
+    dplyr::filter(arc_dataset=="NMeso")
+  gp_elpd = GPfit::GP_fit(X=aux$eta_PO,Y=aux$Estimate)
+  elpd_gp_estimate = data.frame( eta_PO=seq(0,1,0.02),
+                                 arc_dataset="NMeso",
+                                 elpd_hat=predict(gp_elpd, xnew=seq(0,1,0.02))$Y_hat )
+  rm(aux,gp_elpd)
+
+  elpd_gp_estimate$arc_dataset = factor(elpd_gp_estimate$arc_dataset,levels="NMeso")
+
+  elpd_gp_best = elpd_gp_estimate %>%
+    group_by(arc_dataset) %>%
+    filter(elpd_hat == max(elpd_hat)) %>%
+    as.data.frame() %>%
+    mutate(eta_PO=round(eta_PO,4))
+
+}
+# elpd_gp_best
+
+plot_model_eval = TRUE
+if( plot_model_eval ){
+  aistats2020smi::set_ggtheme()
+
+  ### GAMMA BF for negative values ###
+  BF_data = aistats2020smi::agric_smi_summary %>%
+    mutate( arc_dataset=factor(arc_dataset,levels=c("NMeso")) ) %>%
+    filter( param=="gamma_po_1",
+            statistic=="prob_leq_0") %>%
+    mutate( value=value/(1-value) ) %>%
+    select( one_of(c("arc_dataset","eta_PO","value")) ) %>%
+    mutate( stat='BF( gamma<0 )', value_hat=value )
+
+  ELPD_data = aistats2020smi::agric_smi_model_eval %>%
+    dplyr::filter(stat=='elpd_waic') %>%
+    mutate( value_hat=-Estimate,stat="-ELPD( Z )") %>%
+    select( one_of(c('arc_dataset','eta_PO','value_hat','stat')) ) %>%
+    merge( elpd_gp_estimate %>% rename(value=elpd_hat) %>% mutate(value=-value) )
+
+  p_elpd <- rbind(ELPD_data,BF_data) %>%
+    ggplot() +
+    geom_line( aes( x=eta_PO, y=value, col=arc_dataset) ) +
+    geom_point( aes( x=eta_PO, y=value_hat, col=arc_dataset) ) +
+    facet_wrap( vars(stat), ncol=1, scales = "free_y" ) +
+    geom_vline( aes(xintercept=eta_PO), col="purple", lty=2, data=elpd_gp_best ) +
+    geom_text( aes(x=eta_PO,y=-elpd_hat,label=eta_PO), hjust="outward", vjust="inward",
+                data=elpd_gp_best%>%mutate(stat="-ELPD( Z )")) +
+    theme( axis.title.y=element_blank(), # Remove y label
+           legend.position="none" ) # Remove legend
+  # print(p_elpd)
+  ggsave( plot=p_elpd,
+          filename="agric_smi_model_eval.pdf",
+          device="pdf", width=13,height=10, units="cm")
+}
+@
+
+In our second example, we apply SMI to the agricultural dataset introduced by \cite{Styring2017}, and analysed using a Cut-model. The authors test for specific agricultural practices in the first urban centres in Mesopotamia. Details of the model are given in \cite{Styring2017}. We give a brief outline.
+
+The observation model has an observed normal response, $Y$, and regression parameters, variances and random effects we collect together as a parameter vector $\psi$ and a three-level categorical variable ``manure-level'' $M$ with the same dimension as $Y$ which is missing data in roughly half the observations. There is a generative model for the missing values in $M$ which is a proportional odds model with intercept parameters $\alpha_1$ and $\alpha_2$ and a scalar regression parameter $\gamma$ for a higher-level covariate, ``site size''. The key quantity of interest is $\gamma$ and the authors test for $\gamma<0$. In terms of the model structures in earlier sections, $M$ plays the role of $\varphi$ and $\gamma$ plays the role of $\theta$. Priors are chosen to be relatively non-informative.
+
+Before we present the results we remark on the phenomenon of \emph{dilution} in multiple imputation (in the sense of \cite{Knuiman1998}) due to “imputation noise” from uncongenial models. This noise typically causes the analyst to \textit{shrink} the estimated effect of interest towards zero. Cut-model inference is multiple imputation and suffers from this problem, where SMI is more robust.
+
+In Fig.~\ref{fig:agric_smi_post_gamma} at top we plot 67\% (dark) and 95\% (light) credible intervals for $\gamma$ as a function of the influence parameter $\eta$. The cut posterior is at the left, at $\eta=0$. We can see the effect of dilution as the mean $\gamma$ drifts up towards zero as $\eta$ approaches zero. The Bayesian posterior is at the right, where credible intervals diverge due to misspecification (as verified by fitting synthetic data). The estimated $elpd$ (the WAIC) is plotted as a function of $\eta$ in Fig.~\ref{fig:agric_elpd}. The optimal $\eta$-value as chosen by $WAIC$ is approximately 0.8. Returning to the top graph in Fig.~\ref{fig:agric_smi_post_gamma}, this is just below the breakdown point for the credible interval in the top graph. It is clear that the evidence for $\gamma<0$ is much stronger at the chosen candidate posterior. We plot the posterior odds for $\gamma<0$ in the lower graph in Fig.~\ref{fig:agric_elpd}.
+In what may be an abuse of terminology, we call this the Bayes factor, because the prior for $\gamma$ is symmetric about zero. We see the evidence for $\gamma<0$ is far stronger at the selected $\eta$-value (about 20) than it is at the cut-model (about 5).
+
+
+\begin{figure}[!ht]
+\begin{center}
+   \includegraphics[width=0.48\textwidth]{agric_smi_post_gamma_po_1}
+   %\includegraphics[width=0.49\textwidth]{agric_data_model_real_gamma_credint_NMeso_impute_spec_twostg_impplaypen_1_priorPO_flat_POrndeff_0}
+\end{center}
+   \caption{ Posterior distribution of $\gamma$ in the \emph{PO} module for different values of $\eta \in [0,1]$ }
+   \label{fig:agric_smi_post_gamma}
+\end{figure}
+
+\begin{figure}[!ht]
+\begin{center}
+   \includegraphics[width=0.48\textwidth]{agric_smi_model_eval}
+\end{center}
+   \caption{ Top: Estimated elpd as predictive criteria for choosing the value of $\eta \in [0,1]$ The maximum is reached near to $\eta=0.8$. Bottom: The Bayes Factor for the hypothesis $H_o:\gamma<0$ }
+   \label{fig:agric_elpd}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsection{Epidemiological study: HPV virus and cervical Cancer} \label{sec:hpv_analysis}
+
+In our final example, we apply SMI to an epidemiological dataset introduced by \cite{Maucort-Boulch2008}, studying the correlation between human papilloma virus (HPV) prevalence and cervical cancer incidence, revisited by \cite{Plummer2015} and \cite{Jacob2017b} in the context of cut vs full models.
+
+The model consist of two modules: a Poisson response for the number of cancer cases $Y_i$, and a Binomial model for the number of women infected with HPV $Z_i$, $i=1,...,13$,
+\begin{gather*}\label{eq:HPV_model}
+Y_i \sim Poisson( \mu_i ) \\
+\mu_i=T_i \exp( \theta_1+\theta_2 \phi_i ) \nonumber \\
+Z_i \sim Binomial(N_i, \phi_i ). \nonumber
+\end{gather*}
+
+<<hpv_smi_mcmc, eval=TRUE, echo=FALSE>>=
+# Levels of influence in SMI
+power_eta_all <- c( 0.01,0.05,0.99,
+                    seq(0,1.00,by=0.10) )
+power_eta_all <- sort( unique(round(power_eta_all,6)) )
+
+compute_mcmc=FALSE
+if(compute_mcmc) {
+foreach( eta_i = seq_along(power_eta_all) ) %do% {
+  # eta_i <- 1
+  eta_pois <- power_eta_all[eta_i]
+  # cat(eta_pois,", ")
+  file_i <- paste("../data/HPV_partial_cut_stan_",formatC(eta_pois,digits=3,format="f",flag="0"),".rds",sep="")
+  if( !file.exists(file_i) ){
+    set.seed(0)
+    hpv_smi_mcmc_i <- aistats2020smi::mcmc_hpv( HPV=aistats2020smi::HPV,
+
+                                                # Number of iterations
+                                                n_iter_mcmc = 5000, # main chain
+                                                n_iter_warmup = 1000,
+                                                n_chains_mcmc = 4, # Number of chains
+                                                n_iter_mcmc_stage_2 = 500, # Subchain
+
+                                                # Cut rate
+                                                eta_pois = eta_pois,
+                                                eta_binom = 1,
+
+                                                mcmc_file = file_i,
+                                                n_cores=n_cores )
+  }
+  NULL
+}
+}
+@
+
+<<hpv_smi_mcmc_plot, eval=TRUE, echo=FALSE>>=
+plot_mcmc=TRUE
+if(plot_mcmc) {
+  # Yellow and black
+  col_aux = colorRampPalette(c("#000000","#FFD500"))( 2 )
+
+  aistats2020smi::set_ggtheme()
+
+  # Joint posterior of theta1 and theta2 under the full and cut model
+  p_theta_joint_cut_full = aistats2020smi::hpv_smi_mcmc_all %>%
+    dplyr::select(one_of(c("eta",'theta1','theta2'))) %>%
+    filter( eta %in% c(0,1) ) %>%
+    mutate( eta=as.factor(eta)) %>%
+    ggplot()+
+    geom_point( aes(x=theta1,y=theta2,col=eta), alpha=0.1 ) +
+    coord_cartesian(xlim=c(-3,-1),ylim=c(0,40)) +
+    scale_color_manual(values=col_aux, name="eta")+
+    guides(colour=guide_legend(override.aes = list(alpha=1)))+
+    # labs(title="Posterior distribution of theta",subtitle="Partial Cut method") +
+    theme_bw() + theme(legend.position = "bottom")
+  ggsave( plot=p_theta_joint_cut_full,
+          filename="hpv_smi_theta_joint_post.pdf",
+          device="pdf",width=10,height=8,units="cm")
+
+  # Marginal posterior of theta1 and theta2 under SMI for all eta
+  p_theta_post = aistats2020smi::hpv_smi_mcmc_all %>%
+    dplyr::select(one_of(c("eta",'theta1','theta2'))) %>%
+    tidyr::pivot_longer(c('theta1','theta2'), names_to = "param") %>%
+    ggplot( aes(x=value,y=eta, group=eta) ) +
+    ggridges::geom_density_ridges(scale = 3, alpha=0.5 ) +
+    scale_y_continuous(expand = c(0, 0)) +     # will generally have to set the `expand` option
+    scale_x_continuous(expand = c(0, 0)) +   # for both axes to remove unneeded padding
+    facet_wrap( ~param, scales = "free_x" ) +
+    ggridges::theme_ridges() +
+    theme( axis.title.x=element_blank() )
+  ggsave( plot=p_theta_post,
+          filename="hpv_smi_theta_post.pdf",
+          device="pdf", width=12,height=8, units="cm")
+}
+@
+
+<<hpv_smi_model_eval, eval=TRUE, echo=FALSE>>=
+compute_model_eval = FALSE
+if(compute_model_eval) {
+  n_obs_hpv = nrow(aistats2020smi::HPV)
+  hpv_smi_model_eval <- foreach( eta_i = seq_along(power_eta_all), .combine=rbind ) %dorng% {
+    # eta_i <- 1
+    loglik_aux <- apply( aistats2020smi::hpv_smi_mcmc_all %>% filter(eta==power_eta_all[eta_i]), 1,
+                         FUN = function(x,HPV) {
+                           aistats2020smi::hpv_loglik( data=HPV,
+                                                       theta=x[paste("theta",1:2,sep="")],
+                                                       phi=x[paste("phi_",1:n_obs_hpv,sep="")] ) },
+                         HPV = aistats2020smi::HPV )
+    loglik_aux <- t(loglik_aux); rownames(loglik_aux)<-NULL
+    # waic_aux <- data.frame( poisson=MissBayes::waic( loglik_aux[,1:n_obs_hpv] ),
+    #                         binomial=MissBayes::waic( loglik_aux[,n_obs_hpv+1:n_obs_hpv] ) )
+    ll_pois <- loglik_aux[,1:n_obs_hpv]
+    ll_binom <- loglik_aux[,n_obs_hpv+1:n_obs_hpv]
+    waic_aux <- data.frame( poisson = c( loo::waic( ll_pois )$estimates[,1],
+                                         loo::loo( ll_pois, r_eff=loo::relative_eff(exp(ll_pois),chain_id=rep(1,nrow(ll_pois))) )$estimates[,1] ),
+                            binomial = c( loo::waic( ll_binom )$estimates[,1],
+                                          loo::loo( ll_binom, r_eff=loo::relative_eff(exp(ll_binom),chain_id=rep(1,nrow(ll_binom))) )$estimates[,1] ) )
+
+    waic_aux <- waic_aux %>%
+      dplyr::mutate( score_id = gsub("loo","psis",rownames(waic_aux))) %>%
+      tidyr::gather( key=module,value=score,-score_id) %>%
+      dplyr::mutate( eta_pois = power_eta_all[eta_i] )
+    waic_aux
+  }
+  save( hpv_smi_model_eval, file="../data/hpv_smi_model_eval.rda")
+}
+@
+
+<<hpv_smi_model_eval_plot, eval=TRUE, echo=FALSE>>=
+plot_model_eval = TRUE
+if(plot_model_eval) {
+  aistats2020smi::set_ggtheme()
+  p_hpv_smi_elpd = aistats2020smi::hpv_smi_model_eval %>%
+    dplyr::mutate( module = dplyr::recode(module, 'poisson'='-elpd poisson', 'binomial'='-elpd binomial') ) %>%
+    dplyr::filter(score_id=='elpd_waic', score>-5000) %>%
+    ggplot( aes(x=eta_pois, y=-score) ) +
+    geom_line( col="red" ) +
+    geom_point( col="red" ) +
+    facet_wrap( vars(module), ncol=2, scales = "free_y" ) +
+    theme( axis.title.y=element_blank() ) +
+    labs( x="eta (over poisson module)" )
+  ggsave( plot=p_hpv_smi_elpd,
+          filename="p_hpv_smi_elpd.pdf",
+          device="pdf",width=10,height=6,units="cm")
+}
+@
+
+In Figure~\ref{fig:HPV_joint_theta} we show the posterior distribution for the parameters $\theta_1,\theta_2$. The top panel shows the resulting samples for the cut model posterior ($\eta=0$) in black and the full posterior ($\eta=1$) in yellow. This graphs coincide with the ones shown by \cite{Jacob2017b}. SMI allows to interpolate between these two distributions. The two panels at the bottom of Fig.~\ref{fig:HPV_joint_theta} show the approximate marginal SMI posterior for the two parameters.
+
+Lastly, we follow \cite{Jacob2017b} in evaluating the predictive performance of the various SMI candidate distribution for $\eta \in [0,1]$. Our criteria is again the elpd, approximated by WAIC. Figure~\ref{fig:HPV_joint_theta} show two panels, with a proxy of elpd for each response  The results are similar to those reported by \cite{Jacob2017b}: For the task of predicting the Binomial data, the cut model performs better (higher -waic at $\eta=0$ on the right panel of Fig.~\ref{fig:HPV_joint_theta}), this is expected as the Poisson module is suspect of misspecification, therefore eliminating contamination improve prediction of $Z$. For the task of predicting the Poisson module, the full model performs better (higher -waic at $\eta=1$ on the left panel of Fig.~\ref{fig:HPV_joint_theta}) as $(\theta_1,\theta_2)$ make use of the information contained in the Binomial data.
+
+\begin{figure}[!ht]
+\begin{center}
+   \includegraphics[width=0.48\textwidth]{hpv_smi_theta_joint_post}
+   \includegraphics[width=0.48\textwidth]{hpv_smi_theta_post}
+\end{center}
+   \caption{ Joint SMI posterior for $\theta_1$ and $\theta_2$ for the HPV model using MCMC on the SMI posterior with $\eta \in [0,1]$}
+   \label{fig:HPV_joint_theta}
+\end{figure}
+
+
+\begin{figure}[!ht]
+\begin{center}
+   \includegraphics[width=0.48\textwidth]{p_hpv_smi_elpd}
+\end{center}
+   \caption{ Estimated elpd (using $WAIC$) as predictive criteria for selection of $\eta\in[0,1]$ for the HPV model. The full model ($\eta=1$) performs better for prediction of the Poisson data, while the cut model ($\eta=0$) dominates for the  Binomial.}
+   \label{fig:HPV_elpd_waic}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Discussion} \label{sec:discussion}
+
+We have given an extension of Bayesian inference to a family of inference procedures indexed by an influence parameter. Our inference procedures bring together Bayesian inference and two qualitatively different inference schemes, power-posteriors and Modular inference/Cut-models, used to treat model misspecification. We show the new family is coherent and falls within the larger loss-based inference framework of \cite{Bissiri2016}.
+
+We gave a straightforward procedure for choosing the inference scheme according to an external $elpd$ criterion, which we implemented using the WAIC and LOOCV. In different examples this selects Bayesian inference, Cut-model inference and interpolating candidate distributions.
+
+When we encounter model misspecification we may consider model elaboration to improve the fit, but we may alternatively expand the inference framework.
+
+%\todo{Section~\ref{sec:discussion}}
+
+% A common reason for ignoring a component of the full likelihood model function is that the analysis is much easier if one does so. In survival analysis, the use of \emph{Partial Likelihoods} \cite{Cox1975} simplifies the estimation by reducing the dimensionality in situations with many nuisance parameters. Our method in principle may not be of practical use in such contexts, as it requires to duplicate some nuisance parameters, which goes against the initial motivation of model simplification in \cite{Cox1975}.
+
+% \todo{variational inference of cut models and SMI}
+
+% \todo{Try SMI in other applications? comment on Xi'an \href{https://www.slideshare.net/xianblog/better-together-statistical-learning-in-models-made-of-modules}{\underline presentation}}
+
+
+\bibliography{Mendeley} % Mendeley bibliography
+
+\end{document}

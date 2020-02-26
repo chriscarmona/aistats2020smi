@@ -5,6 +5,8 @@
 doc
 inst/doc
 inst/include/aistats2020smi*.h
+inst/HPV_partial_cut_stan_*.rds
+inst/*_smi_bayes_*.rds
 man
 Meta
 **/**/.DS_Store

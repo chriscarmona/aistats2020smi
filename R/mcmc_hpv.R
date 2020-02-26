@@ -111,7 +111,7 @@ mcmc_hpv <- function( HPV, # HPV data
                       # Other
                       mcmc_file=NULL,
                       n_cores ) {
-  browser()
+  # browser()
   # Data in stan format #
   HPV_data_stan <- list( n_obs=nrow(HPV),
                          nhpv = HPV$nhpv,
@@ -139,7 +139,7 @@ mcmc_hpv <- function( HPV, # HPV data
   HPV_data_stan$eta_binom = 0
 
   imp_i=1
-  hpv_mcmc_smi_stage2 <- foreach::foreach( imp_i = 1:nrow(hpv_mcmc_pow$phi),
+  hpv_mcmc_stage2 <- foreach::foreach( imp_i = 1:nrow(hpv_mcmc_pow$phi),
                             .combine = rbind ) %dorng% {
                               # imp_i=1
 
