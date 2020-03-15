@@ -59,18 +59,14 @@
 
 % handle tweaks for camera-ready copy vs. submission copy
 \if@preprint
-  \newcommand{\@noticestring}{%
-    %Preprint. Under review.%
+  \newcommand{\@noticestring}{%%
   }
 \else
   \if@neuripsfinal
-    \newcommand{\@noticestring}{%
-      \@neuripsordinal\/ Conference on Neural Information Processing Systems
-      (NeurIPS \@neuripsyear), \@neuripslocation.%
+    \newcommand{\@noticestring}{%%
     }
   \else
-    \newcommand{\@noticestring}{%
-      %Submitted to \@neuripsordinal\/ Conference on Neural Information Processing Systems (NeurIPS \@neuripsyear). Do not distribute.%
+    \newcommand{\@noticestring}{%%
     }
 
     % line numbers for submission

@@ -7,6 +7,8 @@ set.seed(0)
 # roxygen2::roxygenise()
 # devtools::document()
 # devtools::install()
+# devtools::check()
+# devtools::build()
 
 # loading required packages #
 req.pck <- c( "aistats2020smi",

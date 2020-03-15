@@ -10,7 +10,7 @@ Authors@R:
            email = "carmona@stats.ox.ac.uk",
            comment = c(ORCID = "0000-0003-0224-4968"))
 Description: Code for the AISTATS 2020 article: Semi-Modular Inference by Carmona & Nicholls (2020).
-License: Apache License (>= 2.0) + file LICENSE
+License: Apache License (>= 2.0)
 Encoding: UTF-8
 LazyData: TRUE
 Biarch: TRUE
@@ -23,6 +23,7 @@ Imports:
     foreach,
     ggplot2,
     ggthemes,
+    loo,
     magrittr,
     methods,
     nlme,
@@ -32,8 +33,8 @@ Imports:
     reshape,
     rstan (>= 2.18.1),
     rstantools (>= 2.0.0),
-    tidyr,
-    loo
+    tibble,
+    tidyr
 LinkingTo: 
     BH (>= 1.66.0),
     Rcpp,
@@ -45,9 +46,17 @@ Suggests:
     abind,
     cowplot,
     doParallel,
+    GPfit,
+    ggcorrplot,
+    ggmcmc,
+    ggridges,
     grDevices,
     mvtnorm,
+    stringr,
     utils
-SystemRequirements: GNU make
-VignetteBuilder: utils
-RoxygenNote: 7.0.2
+SystemRequirements:
+    GNU make
+VignetteBuilder:
+    utils
+RoxygenNote:
+    7.0.2

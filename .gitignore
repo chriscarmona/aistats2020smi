@@ -16,3 +16,4 @@ src/stanExports*.h
 **/**/RcppExports.R
 src/*.o
 src/*.so
+vignettes/*.pdf

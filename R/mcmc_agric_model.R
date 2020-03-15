@@ -468,7 +468,7 @@ mcmc_agric_model <- function( data_arc,
                 theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- ( opt_accept_rate - aux[1] ) / aux[2]
               } else {
                 # If the relation is different, then vary the size of the interval randomly
-                theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- theta_prop_int_adapt[adapt_i,theta_names[par_i]] * rstats::runif(1,0.5,2)
+                theta_prop_int_adapt[adapt_i+1,theta_names[par_i]] <- theta_prop_int_adapt[adapt_i,theta_names[par_i]] * stats::runif(1,0.5,2)
               }
             }
           }

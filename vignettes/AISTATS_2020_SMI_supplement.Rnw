@@ -1,7 +1,7 @@
 % !Rnw weave = Sweave
 % \VignetteEngine{utils::Sweave}
 % \VignetteIndexEntry{ Supplementary material to Carmona and Nicholls (2020) Semi-Modular Inference }
-% \VignetteDepends{ magrittr, ggplot2, ggridges, dplyr, tidyr, foreach, doParallel, doRNG, cowplot, abind, mvtnorm }
+% \VignetteDepends{ abind, cowplot, doParallel, doRNG, foreach, GPfit, ggplot2, ggcorrplot, ggmcmc, ggridges, dplyr, magrittr, mvtnorm, stringr, tidyr }
 % \VignetteKeyword{AISTATS}
 % \VignetteKeyword{SMI}
 % \VignetteKeyword{Supplement}
@@ -19,7 +19,7 @@
 Chris U. Carmona \\
 Department of Statistics\\
 University of Oxford\\
-Oxford, U \\
+Oxford, UK \\
 \texttt{carmona@stats.ox.ac.uk}\\
 \And
 Geoff K. Nicholls \\
@@ -66,14 +66,14 @@ acomb <- function(...) {abind(..., along=3)}
 
 \begin{document}
 \SweaveOpts{concordance=TRUE}
+
 \maketitle
 
-In this document we present additional material which complements the main article. The numbers of sections in this document is aligned with the sections in the main article, for the ease of referencing (this does not apply for subsections and lower levels).
-
+In this document we present additional material which complements the main article. The section numbers in this document are aligned with the sections in the main article, for the ease of referencing.
 
 \textbf{Notation: } For the sake of compactness in our derivations, the following expressions are used:
 \begin{align*}
-p(Z) &= \int \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi\\
+p(Z) &= \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi\\
 p(Z,Y)_{\theta} &= \int \int p(Z \mid \varphi) \; p( Y \mid \varphi, \theta ) \; p(\varphi,\theta) \; d\varphi \; d\theta\\
 p(Z,Y_{\eta})_{\tilde\theta} &= \int \int p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta\\
 p(Y_{\eta})_{\tilde\theta} &= \int \int p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta\\
@@ -81,20 +81,22 @@ p(Y,\varphi)_{\theta} &= \int  p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta)
 p(Y  \mid  \varphi)_{\theta} &= \frac{1}{p(\varphi)} \; p(Y , \varphi)_{\theta}\\
 \end{align*}
 
-All the figures and numerical results presented in the main text and this supplementcan be replicated using our R package, \texttt{aistats2020smi}, available in Github.
+All figures and numerical results presented in the main text and this supplement can be replicated using our R package, \texttt{aistats2020smi}, available in Github.
 <<load_aistats2020smi, eval=TRUE, echo=TRUE>>=
 # devtools::install_github("christianu7/aistats2020smi")
 library(aistats2020smi)
 @
 
-\setcounter{section}{1}
+\section{Introduction}
+
+Here are a few remarks on model misspecification. Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. Notice that this may be caused by a misspecified observation model, as in the HPV example in the main text, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
+
+Like the power posterior (\cite{Walker2001, Bissiri2016, Holmes2017, Grunwald2017, Miller2018a}), the SMI procedure can alternatively be thought of as measuring misspecification. We can measure a model's goodness of fit using the $\eta^*$-values of its modules. Using the degree of influence as a measure of misfit has the advantage that it is defined on a standard scale $[0,1]$ with $\eta^*=1$ corresponding to no evidence for misfit and $\eta^*=0$ indicating the module should be removed entirely when we estimate parameters in the other modules, and indicating substantial misspecification.
 
 \section{Background methods}\label{sec:background}
 
-% Geoff comments on misspecification
-Here are a few remarks on model misspecification. Classically, misspecification is identified in goodness-of-fit checks as poor posterior predictive performance on held out data. In this paper, a model is relatively more misspecified if it has relatively worse performance in posterior predictive checks. Notice that this may be caused by a misspecified observation model, as is the case in the example in Sections~\ref{sec:hpv_analysis}, but unrepresentative prior assumptions may also lead to mispecification. This is illustrated in Section~\ref{sec:biased_data}. The example in Section~\ref{sec:agric_analysis} arguably suffers from both forms of mispecification.
-
-\subsection{Explicit formulae for cut posterior}
+\subsection{Modular Inference: cut model}
+\subsection*{Explicit formulae for cut posterior}
 
 The graphical model analysed in the main text is shown in Figure~\ref{fig:toy_multimodular_model}.
 
@@ -142,56 +144,65 @@ Note the relation between the cut posterior and the conventional posterior
 
 \section{Semi-Modular Inference} \label{sec:smi}
 
-\subsection{Explicit formulae for SMI posterior}
-
+\subsection{SMI distributions}
+\subsection*{Explicit formulae for SMI posterior}
 
 The \textbf{$\eta$-smi posterior} is defined as
 \begin{align} \label{eq:smi_post}
- p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) \; p(\theta \mid Y,\varphi) \nonumber \\
- &= \frac{ p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) }{ p(Z, Y)_{\tilde\theta}} \frac{ p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) }{ p( Y , \varphi)_{\theta} } \nonumber \\
+ p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y ) &= p_{pow,\eta}(\varphi,\tilde\theta \mid Z,Y) \; p(\theta \mid Y,\varphi) \nonumber \\
+ &= \frac{ p(Z \mid \varphi) \; p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) }{ p(Z, Y_{\eta})_{\tilde\theta}} \frac{ p( Y \mid \varphi,  \theta ) \; p(\varphi,\theta) }{ p( Y , \varphi)_{\theta} } \nonumber \\
  &= p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} \; p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \\
  &\propto p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} p(Y \mid \varphi, \theta ) \; \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\varphi, \theta, \tilde\theta) \nonumber
 \end{align}
 
 In the penultimate step, we assume that $\theta$ and $\tilde\theta$ are conditionally independent given $\varphi$ in the prior, so $ p(\varphi, \theta, \tilde\theta) = p(\theta \mid \varphi) p(\tilde\theta\mid \varphi) p(\varphi)= p( \varphi, \theta ) \; p( \varphi, \tilde\theta ) \frac{1}{p(\varphi)} $.
 
-From here is easy to see two particular cases of the $\eta$-smi posterior: the cut model $p_{smi,\eta}(\varphi,\theta \mid Z,Y) = p_{cut}(\varphi,\theta \mid Z,Y)$ when $\eta=0$; and the conventional posterior
+From here is easy to see two particular cases of the $\eta$-smi posterior: taking marginals over $\tilde\theta$ in SMI, the cut model $p_{smi,\eta}(\varphi,\theta \mid Z,Y) = p_{cut}(\varphi,\theta \mid Z,Y)$ when $\eta=0$; and the conventional posterior
  $p_{smi,\eta}(\varphi,\theta \mid Z,Y) = p(\varphi,\theta \mid Z,Y)$ when $\eta=1$.
 
 \section{Analysis with (Semi-)Modular Inference} \label{sec:smi_considerations}
 
-\subsection{Coherent update of beliefs}
+\subsection{Coherence of (Semi-)Modular Inference}
+
+\subsubsection{Coherent update of beliefs} \label{sec:bissiri_summary}
 In \cite{Bissiri2016}, the conventional update of beliefs provided by Bayes theorem is expanded, providing a generalised framework in which alternative inferential options are justified beyond the conventional posterior.
 
-The framework to some extent relies on the idea that an update of beliefs must exist. This update of beliefs is performed, under a decision theory framework, by a function $\psi$, which turns the prior into posterior beliefs by incorporating new observed data $y$ via a loss function $l(\theta;y)$, that is
+Let's use single-module notation in this Subsection~\ref{sec:bissiri_summary}, so we are aligned with \cite{Bissiri2016}. Denote newly observe data as $Y$ and the parameter of interest $\theta$.
+
+The framework established by \cite{Bissiri2016} relies on the idea that an update of beliefs must exist. This update of beliefs is performed, under a decision theory framework, by a function $\psi$, which turns the prior into posterior beliefs by incorporating new observed data $y$ via a loss function $l(\theta;y)$. that is:
 \begin{equation*}
   p(\theta \mid y) = \psi\{ l(\theta;y) , p(\theta) \}
 \end{equation*}
 
-Such update $\psi$ is \textbf{Coherent} if it ensures that we end up with the same posterior, whether we update our beliefs by observing all data simultaneously or by observing the data sequentially,
+Such update $\psi$ is \textbf{Coherent} if it ensures that we preserve the posterior regardless of the order in which the data was observed. In other words, the posterior is the same whether we update our beliefs by observing all data simultaneously or by observing the data sequentially,
 \begin{equation*}
   \psi\{ l(\theta;x_2) , \psi\{ l(\theta;x_1) , p(\theta) \} \} = \psi\{ l(\theta;x_1)+l(\theta;x_2) , p(\theta) \}
 \end{equation*}
 
-They show that an optimal, valid and coherent update of beliefs is of the form
+The authors show that an optimal, valid and coherent update of beliefs is of the form
 \begin{equation*}
 	p(\theta \mid y ) = \psi\{ l(\theta;y) , p(\theta) \} = \frac{ \exp\{ -l(\theta;y) \} \; p(\theta) }{\int \exp\{ -l(\theta;y) \} \; p(\theta) \; d\theta}
 \end{equation*}
 
-The flexibility of the framework stablished by \cite{Bissiri2016} allows us to analyse the SMI posterior and the cut model posterior as alternative updates of beliefs. From Eq.~\ref{eq:smi_post} we can see that the loss function underlying the SMI posterior is
-\begin{equation} \label{eq:smi_loss}
-  l_{smi,\eta}( (\varphi,\theta,\tilde\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) - \eta \log p(Y \mid \varphi,\tilde\theta) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi) .
-\end{equation}
-Similarly, from Eq.~\ref{eq:cut_post} we can see that the loss function for the cut model is
+\subsubsection{Coherence of the SMI posterior} \label{sec:suppl_cut_consistency}
+
+Back in our multi-modular setting, the flexibility of the framework allows us to analyse the SMI posterior and the cut model posterior as valid schemes for the update of beliefs, which differ from the traditional fully-Bayesian update.
+
+In the proofs which follow we work with SMI at an arbitrary fixed $\eta$. Since this means the results hold at $\eta=0$, they hold for modular inference/cut models/Bayesian multiple imputation, at least for imputation in the modular setting we consider.
+
+From Eq.~\ref{eq:cut_post} we can see that the loss function underlying the update of beliefs in the cut model is
 \begin{equation} \label{eq:cut_loss}
   l_{cut}( (\varphi,\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi).
 \end{equation}
 
+Similarly, from Eq.~\ref{eq:smi_post} we can derive the loss function underlying the update of beliefs in SMI the posterior,
+\begin{equation} \label{eq:smi_loss}
+  l_{smi,\eta}( (\varphi,\theta,\tilde\theta) ; (Z,Y) ) = - \log p(Z \mid \varphi) - \eta \log p(Y \mid \varphi,\tilde\theta) -\log p(Y \mid \varphi,\theta) + \log p(Y \mid \varphi) .
+\end{equation}
 
-\subsection{Coherence of the SMI posterior} \label{sec:suppl_cut_consistency}
-Here we demonstrate that the smi posterior preserve multi-modular coherence. In multi-modular settings, coherence must hold in two ways: 1) by observing responses from different modules one after the other (i.e. first $Z$, and then $Y$); and 2) by observing sequential fragments within the same module (e.g. first $Z_1$, and then $Z_2$, with $Z=(Z_1,Z_2)$).
+Here we prove that the SMI posterior preserves multi-modular coherence. In multi-modular settings, coherence must hold in two ways: 1) by observing responses from different modules one after the other (i.e. first $Z$, and then $Y$); and 2) by observing sequential fragments within the same module (e.g. first $Z_1$, and then $Z_2$, with $Z=(Z_1,Z_2)$).
 
-The SMI posterior in Eq.~\ref{eq:smi_post} updates the belief distribution by observing the two datasets simultaneously. Nevertheless, we can also update by observing data only from one module at a time, and still preserve loss function in eq.\ref{eq:smi_loss}.
+The SMI posterior in Eq.~\ref{eq:smi_post} updates the belief distribution by observing the two datasets simultaneously. Under coherent inference, we can also update by observing data only from one module at a time, and still preserve the loss function in eq.\ref{eq:smi_loss}.
 
 Say our current distribution of beliefs about $(\varphi,\theta, \tilde\theta)$ is $p(\varphi,\theta, \tilde\theta)$. Our updated belief by observing \textit{only} $Z$ would be
 \begin{align} \label{eq:smi_post_z}
@@ -207,23 +218,27 @@ similarly, if we observe \textit{only} $Y$ our updated beliefs are
  &= p( Y \mid \varphi, \tilde \theta )^\eta \; p( Y \mid \varphi,  \theta ) \frac{ 1 }{ \int \int p( Y \mid \varphi, \tilde \theta )^\eta \; p(\varphi,\tilde\theta) \; d\varphi \; d\tilde\theta} \frac{ p(\varphi) }{ \int  p( Y \mid \varphi,  \theta ) \; p(\varphi, \theta ) \;  d\theta} p(\varphi, \theta, \tilde\theta) \nonumber
 \end{align}
 
-\subsubsection{Coherence under sequential modules}
+\subsubsection*{Coherence when observing data for different modules sequentially.}
 
 First, we show that the update from prior to posterior, is equivalent to updating sequentially first $Z$ and then $Y$. This is (a)=(b)+(c) in the following diagram:
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(b)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z) \ar[r,"(c)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z,Y)
+p(\varphi,\theta,\tilde\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(b)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z) \ar[r,"(c)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z,Y)
 \end{tikzcd}
 
-The update (a) is given by Equation~\ref{eq:smi_post}.
+The update (a) is Eq.~\ref{eq:smi_post}, updating beliefs by only observing both $Z$ and $Y$
+\begin{equation*}
+    p_{(a)}(\varphi,\theta,\tilde\theta \mid Z, Y) = p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z, Y)
+\end{equation*}
 
-The update (b) is in Eq.~\ref{eq:smi_post_z}
+The update (b) is similar to Eq.~\ref{eq:smi_post_z}, updating beliefs only with data $Z$.
 \begin{align} \label{eq:smi_update_b}
- p_{(b)}(\varphi,\theta,\tilde\theta \mid Z) &= p(Z \mid \varphi) \; \frac{1}{ p(Z)} p(\varphi, \theta, \tilde\theta) \nonumber \\
+ p_{(b)}(\varphi,\theta,\tilde\theta \mid Z) &= p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z) \\
+ &= p(Z \mid \varphi) \; \frac{1}{ p(Z)} p(\varphi, \theta, \tilde\theta) \nonumber \\
  &= p(Z \mid \varphi) \; \frac{1}{  \int p(Z \mid \varphi) \; p(\varphi) \; d\varphi } p(\varphi, \theta, \tilde\theta).
 \end{align}
 
-The update (b)+(c) is equivalent to Eq.~\ref{eq:smi_post_y} substituting the current beliefs with $p_{(b)}(\varphi,\theta,\tilde\theta \mid Z)$
+The update (c) is equivalent to Eq.~\ref{eq:smi_post_y} substituting the current beliefs with $p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z)$, and updating beliefs only with data $Y$.
 \begin{align*}
  p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y) &\propto p( Y \mid \varphi, \tilde \theta )^\eta p( Y \mid \varphi,  \theta ) \frac{ p_{(b)}(\varphi \mid Z) }{ \int  p( Y \mid \varphi,  \theta ) \; p_{(b)}(\varphi, \theta \mid Z ) \;  d\theta} p_{(b)}(\varphi, \theta, \tilde\theta \mid Z)\\
  &\propto p(Z \mid \varphi) p( Y \mid \varphi, \tilde \theta )^\eta p( Y \mid \varphi,  \theta ) \frac{ 1 }{ P(Y \mid \varphi )_{\theta} } p(\varphi, \theta, \tilde\theta).
@@ -240,7 +255,7 @@ The equivalence $p_{(b)+(c)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{smi,\eta}
 Now, we want a similar result by first observing $Y$ and then $Z$, i.e. (a)=(d)+(e) in the following diagram
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(d)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y) \ar[r,"(e)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z,Y)
+p(\varphi,\theta,\tilde\theta) \ar[rr,"(a)", bend left=10] \ar[r,"(d)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Y) \ar[r,"(e)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z,Y)
 \end{tikzcd}
 
 The update (a) is again given by Equation~\ref{eq:smi_post}.
@@ -257,13 +272,13 @@ The update (d)+(e) is equivalent to Eq.~\ref{eq:smi_post_z} substituting the cur
 \end{align*}
 The equivalence $p_{(d)+(e)}(\varphi,\theta,\tilde\theta \mid Z, Y)=p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z,Y)$ is direct from comparing the last formula with Eq.~\ref{eq:smi_post}.
 
-\subsubsection{Coherence under data partition from the same module}
+\subsubsection*{Coherence when observing data partitioned from the same module.}
 
-Now we verify that the smi posterior is coherent when observing a sequential portions of the same module. Define the partitions $Z=(Z_1,Z_2)$ and $Y=(Y_1,Y_2)$.
+We now verify that the SMI posterior is coherent when observing a sequential portions of the same module. Define the partitions $Z=(Z_1,Z_2)$ and $Y=(Y_1,Y_2)$.
 
 First, we verify coherence for the partition of data $Z$. We want to check (b)=(b1)+(b2) in the following diagram.
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(b)", bend left=10] \ar[r,"(b1)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z_1) \ar[r,"(b2)", swap] & p_{smi,\eta}(\varphi,\theta \mid Z)
+p(\varphi,\theta,\tilde\theta) \ar[rr,"(b)", bend left=10] \ar[r,"(b1)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z_1) \ar[r,"(b2)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Z)
 \end{tikzcd}
 
 Update (b) is the same as defined above in Equation~\ref{eq:smi_update_b}
@@ -280,7 +295,7 @@ clearly $p_{(b1)+(b2)}(\varphi,\theta,\tilde\theta \mid Z_1,Z_2)=p_{(b)}(\varphi
 Lastly, we verify coherence for the partition of data $Y$. We want to check (d)=(d1)+(d2) in the following diagram.
 
 \begin{tikzcd}
-p(\varphi,\theta) \ar[rr,"(d)", bend left=10] \ar[r,"(d1)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y_1) \ar[r,"(d2)", swap] & p_{smi,\eta}(\varphi,\theta \mid Y)
+p(\varphi,\theta,\tilde\theta) \ar[rr,"(d)", bend left=10] \ar[r,"(d1)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Y_1) \ar[r,"(d2)", swap] & p_{smi,\eta}(\varphi,\theta,\tilde\theta \mid Y)
 \end{tikzcd}
 
 Update (d) is the same as defined above in Equation~\ref{eq:smi_update_d}
@@ -304,12 +319,14 @@ from here is clear that $p_{(d1)+(d2)}(\varphi,\theta,\tilde\theta \mid Y_1,Y_2)
 \end{align*}
 here again, we assumed that $\theta$ and $\tilde\theta$ are conditionally independent given $\varphi$ in the prior, so $ p(\varphi, \theta, \tilde\theta) = p( \varphi, \theta ) \; p( \varphi, \tilde\theta ) \frac{1}{p(\varphi)} $.
 
-\subsection{Detailed balance of SMI posterior}
+\subsection{Targeting the modular posterior}
 
-Here we show that the $\eta$-smi posterior (and cut posterior in particular) preserves detail balance with the transition kernel implied by a two-stage update using two conditional distributions
+\subsubsection{Detailed balance of SMI posterior}
+
+Here we show that the $\eta$-smi posterior (and cut posterior in particular) preserves the detailed balance condition when we use the transition kernel implied by the two-stage MCMC algorithm proposed in the main text.
 
 \begin{enumerate}
-    \item Sample $(\varphi,\tilde\theta) \sim p_{\eta-pow}(\varphi, \tilde\theta \mid Z, Y) = p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} } p(\varphi, \tilde\theta) $
+    \item Sample $(\varphi,\tilde\theta) \sim p_{pow,\eta}(\varphi, \tilde\theta \mid Z, Y) = p(Z \mid \varphi) \; p(Y \mid \varphi, \tilde\theta )^{\eta} \frac{1}{ p(Z, Y_{\eta} )_{\tilde\theta} } p(\varphi, \tilde\theta) $
     \item Sample $\theta \sim p( \theta \mid Y,\varphi )=p(Y \mid \varphi, \theta ) \frac{1}{ p(Y \mid \varphi)_{\theta} } p(\theta) $
 \end{enumerate}
 
@@ -324,7 +341,7 @@ K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta)= K(\varphi',\
 
 By construction, the first stage of the update (using the powered likelihood) is in detailed balance with the powered likelihood, i.e. satisfies
 \begin{equation*}
-p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y) K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) = p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')
+p_{pow,\eta}(\varphi,\tilde\theta \mid Z,Y) K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) = p_{pow,\eta}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')
 \end{equation*}
 
 From here we see that the $\eta$-smi posterior in Eq.~\ref{eq:smi_post} satisfies detailed balance with the transition kernel in eq.
@@ -332,22 +349,32 @@ From here we see that the $\eta$-smi posterior in Eq.~\ref{eq:smi_post} satisfie
 
 \begin{align*}
 p_{smi,\eta}&(\varphi,\theta,\tilde\theta \mid Z,Y) K(\varphi',\theta',\tilde\theta' \mid \varphi,\theta,\tilde\theta) \\
-&= [ p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y)p(\theta \mid Y,\varphi) ][ K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) p(\theta' \mid Y,\varphi') ] \\
-&= p_{\eta-pow}(\varphi, \tilde\theta \mid Z,Y) p(\theta \mid Y,\varphi) \frac{p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')}{p_{\eta-pow}(\varphi,\tilde\theta \mid Z,Y)} p(\theta' \mid Y,\varphi')\\
-&= p_{\eta-pow}(\varphi',\tilde\theta' \mid Z,Y) p(\theta' \mid Y,\varphi') K(\varphi,\tilde\theta \mid \varphi',\tilde\theta') p(\theta \mid Y,\varphi)\\
+&= [ p_{pow,\eta}(\varphi, \tilde\theta \mid Z,Y)p(\theta \mid Y,\varphi) ][ K(\varphi',\tilde\theta' \mid \varphi,\tilde\theta) p(\theta' \mid Y,\varphi') ] \\
+&= p_{pow,\eta}(\varphi, \tilde\theta \mid Z,Y) p(\theta \mid Y,\varphi) \frac{p_{pow,\eta}(\varphi',\tilde\theta' \mid Z,Y) K(\varphi,\tilde\theta \mid \varphi',\tilde\theta')}{p_{pow,\eta}(\varphi,\tilde\theta \mid Z,Y)} p(\theta' \mid Y,\varphi')\\
+&= p_{pow,\eta}(\varphi',\tilde\theta' \mid Z,Y) p(\theta' \mid Y,\varphi') K(\varphi,\tilde\theta \mid \varphi',\tilde\theta') p(\theta \mid Y,\varphi)\\
 &=p_{smi,\eta}(\varphi',\theta',\tilde\theta' \mid Z,Y) K(\varphi,\theta,\tilde\theta \mid \varphi',\theta',\tilde\theta')
 \end{align*}
 
+\subsubsection{Further details about Nested MCMC for SMI posterior.}
 
-\subsection{Scalability of MCMC. Big-O runtime and bottlenecks}
+Our implementation of MCMC targeting the SMI posterior is a two-stage sampler described in Algorithm 1 in the main article.
+
+This is arguably the simpler approach that has been discussed in literature about MCMC targeting a modular posterior (e.g. Unbiased MCMC via couplings \citep{Jacob2017}).
+
+Algorithm 1 does not make specific assumptions about the class of MCMC sampler that is used at each stage. The only requirement is to check convergence in both stages. For the first step, sampling $\phi$, we proceed as any traditional implementation of MCMC, running the chains until we have satisfied classical convergence test. The second step, sampling $\theta$, we only need to guarantee that the last sample in every sub-chain are taken after we reached the equilibrium distribution.
+
+Our examples in Section~\ref{sec:data_analyses} use standard MCMC at each step. For the agricultural data in Sec.\ref{sec:agric_analysis} we use random walk Metropolis-Hastings in both stages. For the epidemiological data, the samplers for both stages are implemented in Stan \citep{Stan2017}, using Hamiltonian Monte Carlo. In both cases we performed convergence analysis for the main Chain (step 1), and experimented with various lengths for the sub-chain, in the end, we choose 500 iterations as a conservative length that guaranteed the last iteration was sampled from the equilibrium distribution. The detailed implementation can be found in the accompanying R package \texttt{aistats2020smi} available in GitHub \footnote{\url{https://github.com/christianu7/aistats2020smi}}.
+
+\setcounter{subsection}{3}
+\subsection{Computational cost of SMI}
 
 Our baseline is standard Bayes-MCMC on the original full model. We suppose for simplicity this was implemented using separate updates for $\theta|\varphi$ and $\varphi|\theta$, though these need not be Gibbs updates.
 Let $\tau_{\varphi,\theta}$ be the Integrated Autocorrelation Time (IACT) of Bayes-MCMC. If the Effective Sample Size (ESS) of the full Bayes-MCMC output is $N$ then we must have done $T=N\tau_{\varphi,\theta}$ MCMC steps. If {\it one Bayes-MCMC step updating both $\theta$ and $\varphi$ has unit cost} then the overall cost is $W_{bm}=T$[time]. This doesn't parallelise.
 
 The SMI posterior is \[
-p_{\eta-smi}(\varphi,\tilde\theta,\theta|Y,Z)=p_{\eta-pow}(\varphi,\tilde\theta|Y,Z)p(\theta|Y,\varphi).
+p_{\eta-smi}(\varphi,\tilde\theta,\theta|Y,Z)=p_{pow,\eta}(\varphi,\tilde\theta|Y,Z)p(\theta|Y,\varphi).
 \]
-If we use the same Bayes-MCMC updates to sample $p_{\eta-pow}(\varphi,\tilde\theta|Y,Z)$ then the work sampling $(\varphi,\tilde\theta)$ at one $\eta$-value is $W_{Bayes}$. Thin the $\varphi$ samples every $\tau_{\varphi,\theta}$ steps to get an ESS about $N$ (this is rough, because the target changes with $\eta$, but reasonable if we allow for some tuning of the MCMC with $\eta$ - we didnt need to tune in our examples).
+If we use the same Bayes-MCMC updates to sample $p_{pow,\eta}(\varphi,\tilde\theta|Y,Z)$ then the work sampling $(\varphi,\tilde\theta)$ at one $\eta$-value is $W_{Bayes}$. Thin the $\varphi$ samples every $\tau_{\varphi,\theta}$ steps to get an ESS about $N$ (this is rough, because the target changes with $\eta$, but reasonable if we allow for some tuning of the MCMC with $\eta$ - we didnt need to tune in our examples).
 
 We use the Bayes-MCMC update for $p(\theta|Y,\varphi)$ in SMI. Let $\tau_\theta$ be the IACT. Typically, $\tau_\theta<\tau_{\varphi,\theta}$ (the target has lower dimension; illustrative proofs can be given in simple special cases) so take $\tau_\theta=\tau_{\varphi,\theta}$ (conservative, and note that these ``side-chains'' targeting $p(\theta|Y,\varphi)$ can be started close to equilibrium using the $\theta$-value output from sampling at the previous step).
 We run the $\theta$-sampler to equilibrium (initialise $\theta^{(t)}$-run with $\theta^{(t-1)}$). Suppose this takes $K\tau_\theta$ steps ($K\approx 5$ is reasonable).
@@ -447,6 +474,7 @@ sigma_y = 1 # variance for Y
 @
 
 The true bias is $\theta=1$. Assume we have an over-optimistic view of the bias, with prior distribution centered in 0 and relatively small prior variance.
+
 <<biased_data_02, eval=TRUE, echo=FALSE>>=
 sigma_phi=Inf # Prior variance for phi
 sigma_theta=0.5 # Prior variance for eta
@@ -455,7 +483,7 @@ param_names = c('phi','theta','theta_tilde')
 param_true = c(phi,theta,theta)
 
 # sequence of eta values in (0,1)
-eta_all = seq(0,1,0.01)
+eta_all = seq(0,1,0.025)
 @
 
 <<biased_data_03, eval=TRUE, echo=FALSE>>=
@@ -510,28 +538,27 @@ posterior$mean
 \begin{figure}[!ht]
   \center
   \includegraphics[width=0.5\textwidth]{SMI_biased_posterior_single_dataset}
-  \caption{Posterior distribution of $\varphi$, $\theta$ and $\tilde\theta$. A black horizontal line shows the true generative value. Mean (solid red line) $\pm$ one std. dev. (dotted blue line) }
+  \caption{Posterior distribution of $\varphi$, $\theta$ and $\tilde\theta$ for a single dataset ($Z$,$Y$). A black horizontal line shows the true generative value. The posterior mean is the solid red line and we show intervals with $\pm$ one posterior std. dev. using dotted blue lines.}
   \label{fig:smi_post_5_1}
 \end{figure}
 
 \subsubsection{Mean Square Error (MSE)}
 
-From Equation~\ref{eq:smi_post}, we can compute the MSE of estimates arising from the SMI posterior $\varphi$, $\theta$ and , $\tilde\theta$,
+From Equation~\ref{eq:smi_post}, we can compute the Posterior Squared Error (SE) of estimates arising from the SMI posterior $\varphi$, $\theta$ and , $\tilde\theta$,
 \begin{align*}
-  MSE(\varphi) &= \Sigma_{[1,1]} + (\mu_{[1]}-\varphi^*)^2\\
-  MSE(\theta) &= \Sigma_{[2,2]} + (\mu_{[2]}-\theta^*)^2\\
-  MSE(\tilde\theta) &= \Sigma_{[3,3]} + (\mu_{[3]}-\theta^*)^2
+  SE(\varphi) &= \Sigma_{[1,1]} + (\mu_{[1]}-\varphi^*)^2\\
+  SE(\theta) &= \Sigma_{[2,2]} + (\mu_{[2]}-\theta^*)^2\\
+  SE(\tilde\theta) &= \Sigma_{[3,3]} + (\mu_{[3]}-\theta^*)^2
 \end{align*}
 
-In the first simulation study of the main text we display $MSE(\varphi)$ and $MSE(\theta)$ to demonstrate that we can reach smaller MSE with values of $\eta$ other than 0 and 1. To generate this plots, we produced 1000 synthetic datasets, computed MSE using Eq.~\ref{eq:smi_post} on each one, with a grid of values of $\eta\in[0,1]$. The MSE lines displayed correspond to the \textit{average} MSE across datasets, for each value of $\eta$.
+In the first simulation study of the main text we display the Mean Squared Error (MSE) for $\varphi$ and $\theta$, which is the result of averaging the posterior SE across datasets. We show that we can reach smaller MSE with values of $\eta$ other than 0 and 1. To generate these plots, we produced 1000 synthetic datasets, computed MSE using Eq.~\ref{eq:smi_post} on each one, with a grid of values of $\eta\in[0,1]$. The MSE lines displayed correspond to the \textit{average} MSE across datasets, for each value of $\eta$.
 
 <<biased_data_05, eval=TRUE, echo=FALSE>>=
-set.seed(123)
 
 # Average Mean Square Error #
-
+set.seed(123)
 # Compute Posterior mean and sd for each iteration
-n_iter = 10
+n_iter = 1000
 Z = matrix(rnorm( n=n*n_iter, mean=phi, sd=sigma_z),n_iter,n)
 Y = matrix(rnorm( n=m*n_iter, mean=phi+theta, sd=sigma_y ),n_iter,m)
 post_eta_all_iter = foreach(iter_i = 1:n_iter,.combine='lacomb', .multicombine=TRUE)  %:%
@@ -589,7 +616,7 @@ ggsave( plot=p,
   \label{fig:SMI_biased_MSE_average}
 \end{figure}
 
-Here we also show a comparison between $\theta$ and $\tilde\theta$. Figure~\ref{fig:SMI_biased_MSE_average} shows that $\tilde\theta$ is dominated by $\theta$ in MSE. The comparison emphasize the convenience of SMI over power likelihood discussed in section 4.4 of the main text.
+Here we also show a comparison between $\theta$ and $\tilde\theta$. Figure~\ref{fig:SMI_biased_MSE_average_theta} shows that $\tilde\theta$ is dominated by $\theta$ in MSE. The comparison emphasises the convenience of SMI over power likelihood discussed in section 4.4 of the main text.
 
 \begin{figure}[!ht]
   \center
@@ -600,7 +627,7 @@ Here we also show a comparison between $\theta$ and $\tilde\theta$. Figure~\ref{
 
 \subsubsection{Expected log pointwise predictive density (elpd)}
 
-The simplicity and conjugacy of this model allow us to derive exact formula for the elpd
+The elpd is %simplicity and conjugacy of this model allow us to derive exact formula for the elpd
 \begin{equation*}
   elpd = \int\int p^*(z,y) \log p_{smi,\eta}( z, y \mid Z,Y) dz dy
 \end{equation*}
@@ -644,24 +671,26 @@ We know the true generative values $\varphi^*$ and $\theta^*$, so we can compute
 
 <<biased_data_06, eval=TRUE, echo=FALSE>>=
 # ELPD approximation via Monte Carlo
-set.seed(0)
-n_new = 10
+set.seed(123)
+n_new = 1000
 
 # generate data from the ground-truth distribution
 Z_new = matrix( rnorm( n=n_iter*n_new, mean=phi, sd=sigma_z), n_iter, n_new )
 Y_new = matrix( rnorm( n=n_iter*n_new, mean=phi+theta, sd=sigma_y), n_iter, n_new )
 
 log_pred_eta_all_iter = foreach(iter_i = 1:n_iter, .combine='acomb', .multicombine=TRUE) %:%
-  foreach( eta_i = seq_along(eta_all), .combine=rbind ) %dopar% {
-    # iter_i=1
-    # new_i = 1
-    # eta_i=1
-    # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
-    predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
-    mvtnorm::dmvnorm( x=cbind(Z_new[iter_i,],Y_new[iter_i,]), mean=predictive[[1]] , sigma=predictive[[2]], log=TRUE )
-}
-# average to get elpd
+    foreach( eta_i = seq_along(eta_all), .combine=rbind ) %dopar% {
+      # iter_i=1
+      # new_i = 1
+      # eta_i=1
+      # posterior = aistats2020smi::SMI_post_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      predictive = aistats2020smi::SMI_pred_biased_data( Z=Z[iter_i,], Y=Y[iter_i,], sigma_z=sigma_z, sigma_y=sigma_y, sigma_phi=sigma_phi, sigma_theta=sigma_theta, sigma_theta_tilde=sigma_theta, eta=eta_all[eta_i] )
+      c( aistats2020smi::dmvnorm_arma( x=cbind(Z_new[iter_i,],Y_new[iter_i,]), mean=as.numeric(predictive[[1]]) , sigma=predictive[[2]], logd=TRUE ) )
+    }
+
+# Average elpd
 elpd_eta_all = apply(log_pred_eta_all_iter,1,mean)
+# plot(x=eta_all,y=elpd_eta_all)
 
 # Plot ELPD
 aistats2020smi::set_ggtheme()
@@ -683,11 +712,7 @@ In Figure~\ref{fig:SMI_biased_elpd} we show the Monte Carlo estimation of the $e
   \label{fig:SMI_biased_elpd}
 \end{figure}
 
-\subsection{Experiments on Bayesian Multiple Imputation}\label{sec:bayes_impute}
-
-Bla
-
-\subsection{Agricultural practices in early civilizations} \label{sec:agric_analysis}
+\subsection{Agricultural data} \label{sec:agric_analysis}
 
 The aim of the study, described in detail in \cite{Styring2017}, is to provide statistical evidence about a specific agricultural practice of the first urban centres in northern Mesopotamia.
 
@@ -701,7 +726,7 @@ The data consists of measurements of nitrogen and carbon isotopes for a collecti
 
 \subsubsection{ The model } \label{sec:agric_model}
 
-We preserved the model stated in \cite{Styring2017}. The main goal of this study is to is to provide statistical evidence for the hypothesis of \emph{extensification} in the ancient urban sites. This hypothesis can be condensed in analysing the strength of the effect of the site size $S_i$ on the corresponding manure level $M_i$ for the records in the archaeological data, $\{i \in \mathcal{A}\}$. The more negative the estimated effect, the stronger the evidence is supporting the extensification hypothesis.
+We preserved the model stated in \cite{Styring2017}. See Figure~\ref{fig:agricurb_model}. The main goal of that study is to test the hypothesis of \emph{extensification} in the ancient urban sites. This hypothesis can be condensed in analysing the strength of the effect of the site size $S_i$ on the corresponding manure level $M_i$ for the records in the archaeological data, $\{i \in \mathcal{A}\}$. The more negative the estimated effect, the stronger the evidence supporting the extensification hypothesis.
 
 However, there is no available information about the Manuring levels in the ancient dataset. This is addressed by using a \emph{Data augmentation} perspective, and consider that all the corresponding values of the manure level in the Archaeological data are missing.
 
@@ -778,9 +803,9 @@ The model consists of a two-module model, which integrates archaeological and ca
   \label{fig:agricurb_model}
 \end{figure}
 
-The model can be studied from a multi-modular perspective. Indeed, the supplement of \cite{Styring2017} performs Bayesian Multiple Imputation (BMI) to impute the missing manure levels with parameters learnt from the $HM$ module, and therefore \emph{cutting} the influence from the $PO$ module into this imputation. The parameters of the $PO$ module are then infered conditional on the imputed values and other information in the archaelogical data.
+The model can be studied from a multi-modular perspective. Indeed, the supplement of \cite{Styring2017} performs Bayesian Multiple Imputation (BMI) to impute the missing manure levels with parameters learnt from the $HM$ module, and therefore \emph{cutting} the influence from the $PO$ module into this imputation. The parameters of the $PO$ module are then inferred conditional on the imputed values and other information in the archaeological data.
 
-In Figure~\ref{fig:agricurb_model_simple} we draw a simplified version of the complete model to clarify how the SMI framework can be applied in this setting. The mapping of variables between the complete and simplified graphs is as follows: the missing manure levels will take the role of $\phi$; the observed data in the $HM$ module is $Z$, the parameters in the $PO$ module will be $\theta$, and the rest of arcahaeological data in the $PO$ module is $Y$.
+In Figure~\ref{fig:agricurb_model_simple} we draw a simplified version of the complete model to clarify how the SMI framework can be applied in this setting. The mapping of variables between the complete and simplified graphs is as follows: the missing manure levels will take the role of $\phi$; the observed data in the $HM$ module is $Z$, the parameters in the $PO$ module will be $\theta$, and the rest of archaeological data in the $PO$ module is $Y$.
 
 \begin{figure}[!ht]
   \begin{center}
@@ -804,13 +829,14 @@ In Figure~\ref{fig:agricurb_model_simple} we draw a simplified version of the co
   \label{fig:agricurb_model_simple}
 \end{figure}
 
-The simplified version resembles our graphical model in Figure~\ref{fig:toy_multimodular_model}. From here it is more clear how the Bayesian imputation approach took by \cite{Styring2017} is equivalent to a cut model: first learning $\phi$ from the $HM$ module, and then learning $\theta$ conditional on $\phi$ and $Y$. This scheme yields our known cut posterior from Eq.~\ref{eq:cut_post}.
+The simplified version resembles our graphical model in Figure~\ref{fig:toy_multimodular_model}. From here it is clear how the Bayesian imputation approach taken by \cite{Styring2017} is equivalent to a cut model: first learn $\phi$/manure-level from the $HM$ module, and then learning $\theta$ (ie $\gamma$) conditional on $\phi$ and $Y$. This scheme yields our known cut posterior from Eq.~\ref{eq:cut_post}.
 \[P_{cut}(\varphi,\theta \mid Z,Y) = P(\varphi \mid Z) \; P(\theta \mid Y,\varphi) \]
 
 We extend the Bayesian imputation approach in \cite{Styring2017} and apply Semi-Modular Inference to their setting.
 \[P_{smi,\eta}(\varphi,\theta \mid Z,Y) = \int P_{pow,\eta}(\varphi, \tilde\theta \mid Z, Y) \; P(\theta \mid Y,\varphi) d\tilde\theta \]
 
-SMI allows us to expand the space of candidate posteriors in a way that we can control smoothly, rather that eliminating, the influence of the $PO$ module in the imputation of the missing Manure Levels.
+SMI allows us to expand the space of candidate posteriors in a way that we can control smoothly, rather that eliminating the influence of the $PO$ module in the imputation of the missing Manure Levels.
+
 
 <<agric_smi_init,eval=TRUE,echo=FALSE>>=
 options(scipen=999, stringsAsFactors=FALSE)
@@ -1054,9 +1080,9 @@ if(plot_mcmc) {
   param_joy = "gamma_po_1"
   foreach::foreach( param_i = param_joy ) %dopar% {
     # param_i = param_joy[1]
-    cat(param_i,"\n")
+    # cat(param_i,"\n")
     p_post_joy = aistats2020smi::agric_smi_post_all %>%
-      select(c("arc_dataset","eta",param_i)) %>% #head()
+      select(c("arc_dataset","eta",all_of(param_i))) %>% #head()
       'colnames<-'(value=c("arc_dataset","eta","value")) %>%
       ggplot( aes(x=value,y=eta, group=eta, fill=arc_dataset) ) +
       geom_vline(xintercept=0)+
@@ -1072,7 +1098,7 @@ if(plot_mcmc) {
     # print(p_post_joy)
     ggsave( plot=p_post_joy,
             filename=paste("agric_smi_post_",param_i,".pdf",sep=""),
-            device="pdf", width=20,height=12, units="cm")
+            device="pdf", width=13,height=8, units="cm")
     NULL
   }
 
@@ -1258,16 +1284,16 @@ In Figure~\ref{fig:agric_smi_post_gamma} we display the collection of candidate 
   \label{fig:agric_smi_post_gamma}
 \end{figure}
 
-To choose the optimal value $\eta=\eta^*$ say, we maximise the Expected Log Predictive Density or \emph{ELPD} \citep{Vehtari2016} to predict a new value of the response in the HM module ($Z_i; i \in \mathcal{A}$ in the diagram). In Figure~\ref{fig:agric_smi_model_eval_elpd_waic} we show the negative ELPD as a function of $\eta$. The optimal value is reached at $\eta^*=$\Sexpr{round(elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],4)}.
+To choose the optimal value, $\eta^*$ say, we maximise the Expected Log Predictive Density or \emph{ELPD} \citep{Vehtari2016} to predict a new value of the response in the HM module ($Z_i; i \in \mathcal{A}$ in the diagram). In Figure~\ref{fig:agric_smi_model_eval_elpd_waic} we show the negative ELPD as a function of $\eta$. The optimal value is reached at $\eta^*=$\Sexpr{round(elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],4)}.
 
 \begin{figure}[!ht]
   \center
   \includegraphics[width=0.7\textwidth]{agric_smi_model_eval_elpd_waic}
-  \caption{Choosing the best SMI posterior candidate by chossing the $\eta$ which maximizes the ELPD.}
+  \caption{Choosing the best SMI posterior candidate by choosing the $\eta$-value maximizing the ELPD.}
   \label{fig:agric_smi_model_eval_elpd_waic}
 \end{figure}
 
-The ELDP changes dramatically and $\eta^*$ is not near 0 or 1. This impacts downstream inference: the Bayes factor of interest changes from $BF_{smi,0}(\gamma \leq 0)=$\Sexpr{round(BF_data[BF_data$eta_PO==0.00,"BF"],2)} in the cut model, to $BF_{smi,0.82}(\gamma \leq 0)=$\Sexpr{round(BF_data[BF_data$eta_PO==elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],"BF"],2)} in the optimal SMI posterior with $\eta=$\Sexpr{round(elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],4)}, a substantial shift in the strength of the evidence for the \emph{extensification} hypothesis. In Figure~\ref{fig:agric_smi_gamma_leq_0_BF} we show the comparison of Bayes Factors  accross values of $\eta \in [0,1]$ for the hypothesis $\gamma \leq 0$.
+The elpd changes dramatically over the range $0\le \eta\le 1$ and $\eta^*$ is clearly distinguished from 0 or 1. This impacts downstream inference: the Bayes factor of interest changes from $BF_{smi,0}(\gamma \leq 0)=$\Sexpr{round(BF_data[BF_data$eta_PO==0.00,"BF"],2)} in the cut model, to $BF_{smi,0.82}(\gamma \leq 0)=$\Sexpr{round(BF_data[BF_data$eta_PO==elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],"BF"],2)} in the optimal SMI posterior with $\eta=$\Sexpr{round(elpd_gp_best[elpd_gp_best$arc_dataset=="NMeso","eta_PO"],4)}, a substantial shift in the strength of the evidence for the \emph{extensification} hypothesis. In Figure~\ref{fig:agric_smi_gamma_leq_0_BF} we show the comparison of Bayes Factors  accross values of $\eta \in [0,1]$ for the hypothesis $\gamma \leq 0$.
 
 \begin{figure}[!ht]
   \center
@@ -1276,13 +1302,10 @@ The ELDP changes dramatically and $\eta^*$ is not near 0 or 1. This impacts down
   \label{fig:agric_smi_gamma_leq_0_BF}
 \end{figure}
 
-\subsection{Epidemiological study: HPV virus and cervical Cancer} \label{sec:hpv_analysis}
-
-<<HPV_01>>=
-rnorm(1)
-@
+\clearpage
+\newpage
 
 \bibliographystyle{apalike} %use the apalike bibliography style
-\bibliography{Mendeley} % Mendeley bibliography
+\bibliography{references} % bibliography
 
 \end{document}
