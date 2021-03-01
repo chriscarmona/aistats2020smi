@@ -11,9 +11,6 @@
 #'     Archaeological Data from excavations in the north Mesopotamia region.
 #'     Data provided by Amy Bogaard <amy.bogaard@arch.ox.ac.uk>
 #'
-#' @usage
-#'     NMeso
-#'
 #' @format
 #'     A data frame with 269 rows and 15 variables.
 #'     \describe{

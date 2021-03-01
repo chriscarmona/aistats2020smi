@@ -11,9 +11,6 @@
 #'     The Modern data were gathered in an experimental setting in which manure level is an independent variable and the isotope ratio is an experiment outcome.
 #'     Data provided by Amy Bogaard <amy.bogaard@arch.ox.ac.uk>
 #'
-#' @usage
-#'     Modern
-#'
 #' @format
 #'     A data frame with 268 rows and 13 variables.
 #'     \describe{

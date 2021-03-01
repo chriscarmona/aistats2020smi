@@ -21,6 +21,8 @@
 #'
 #' @param n_iter Integer. Number of iterations in the main MCMC chain.
 #' @param n_iter_sub Integer. Number of updates in the subchain for parameters in the PO module.
+#' @param n_warmup Integer. Number of updates discarded when "warming-up" the MCMC
+#' @param n_thin Integer. One of every n_thin updates will be kept (thinning the chain)
 #'
 #' @param theta_ini Numeric vector. Initial values for the parameters
 #' @param theta_min_max matrix with two columns, minimum and maximum values for each parameter
@@ -33,6 +35,8 @@
 #' @param ManureLevel_arc_imp_ini Initial values for imputing the missing values of Rainfall
 #' @param Rainfall_arc_imp_ini Initial values for imputing the missing values of Rainfall
 #'
+#' @param imp_playpen (Experimental). If True, The missing manure levels are imputed in to avoid quasi-complete separation in the PO module.
+#'
 #' @param gibbs_hm Boolean. Shall we use Gibss to update parameters in the HM module. If FALSE, M_H is used.
 #'
 #' @param PO_expand Indicates if the Proportional Odds models should be expanded by considering an additional mixture component
@@ -41,8 +45,10 @@
 #' @param lambda_mix_PO_prior Numeric vector. indicates the two parameters of the beta prior for the mixture weight
 #'
 #' @param keep_imp Indicates if the imputed values for missing data should be returned
+#' @param keep_ll Indicates if the individual log-likelihoods should be returned
+#' @param elpd Indicates if the ELPD should be computed and returned
 #'
-#' @param out_file_rds Indicates a file (.rds) where the output should be saved
+#' @param out_file_rda Indicates a file (.rda) where the output should be saved
 #' @param log_file Indicates a file (.txt) where the log of the process should be saved
 #' @param devel Development mode
 #'
@@ -51,7 +57,7 @@
 #' The hierarchical model consists of two parts: The Proportional Odds (PO1) component, and the Gaussian Linear model (HM1).
 #'   HM1:
 #'      normd15N ∼ 1 + Rainfall + ManureLevel + (1|Site)
-#'      weights = varIdent(form=~1|Category)
+#'      weights = nlme::varIdent		(form=~1|Category)
 #'   PO1:
 #'      ManureLevel ∼ 1 + Size + (1|Site)
 #'      link = "logistic"
@@ -90,12 +96,17 @@
 #'
 #' }
 #'
-#' @import foreach
-#' @import loo
-#' @import nlme
-#' @import ordinal
 #'
-#' @importFrom stats runif
+#' @importFrom coda mcmc
+#' @importFrom dplyr mutate
+#' @importFrom foreach foreach %do%
+#' @importFrom loo loo waic
+#' @importFrom nlme fixed.effects intervals lme random.effects varIdent
+#' @importFrom ordinal clm clmm
+#' @importFrom rlang .data
+#' @importFrom stats lm model.matrix runif setNames
+#' @importFrom tibble rownames_to_column
+#' @importFrom tidyr pivot_longer
 #'
 #' @export
 
@@ -141,7 +152,7 @@ mcmc_agric_model <- function( data_arc,
                               keep_ll=FALSE,
                               elpd=FALSE,
 
-                              out_file_rds=NULL,
+                              out_file_rda=NULL,
                               log_file=NULL,
                               devel=FALSE ) {
 
@@ -152,18 +163,18 @@ mcmc_agric_model <- function( data_arc,
   #    link = "logistic"
   # HM1:
   #    normd15N ∼ 1 + Rainfall + ManureLevel + (1|Site)
-  #    weights = varIdent(form=~1|Category)
+  #    weights = nlme::varIdent		(form=~1|Category)
 
   # This makes model.matrix avoid lossing rows when NA values are present
   prev_na.action <- options('na.action')
   options(na.action='na.pass')
   on.exit(options(na.action=prev_na.action$na.action))
 
-  if( !is.null(out_file_rds) ) {
+  if( !is.null(out_file_rda) ) {
     # Checking that its possible to save the results #
     mcmc_res <- NULL
-    saveRDS( mcmc_res, file=out_file_rds )
-    file.remove(out_file_rds)
+    save( mcmc_res, file=out_file_rda )
+    file.remove(out_file_rda)
   }
 
   mcmc_clock <- Sys.time()
@@ -258,7 +269,7 @@ mcmc_agric_model <- function( data_arc,
   # Length of the interval for the uniform proposal of each theta
   aux <- theta_prop_int
 
-  theta_prop_int <- setNames(rep(1,n_par),theta_names)
+  theta_prop_int <- stats::setNames(rep(1,n_par),theta_names)
 
   # the uniform interval for the "variance" terms goes
   # sigma * unif( 1/theta_prop_int , theta_prop_int )
@@ -272,7 +283,7 @@ mcmc_agric_model <- function( data_arc,
   rm(aux)
 
   ### Initial values ###
-  theta_mcmc_ini <- setNames(rep(NA,n_par),theta_names)
+  theta_mcmc_ini <- stats::setNames(rep(NA,n_par),theta_names)
 
   # HM parameters #
   data_mod$ManureLevel <- factor( match(data_mod$ManureLevel,c("low","medium","high")), levels=1:3)
@@ -280,15 +291,15 @@ mcmc_agric_model <- function( data_arc,
   data_mod$ind_v <- as.factor( data_mod$ind_v )
   model_hm <- nlme::lme( normd15N ~ Rainfall + ManureLevel,
                          random=~1|Site,
-                         weights=varIdent(form=~1|ind_v),
+                         weights=nlme::varIdent		(form=~1|ind_v),
                          data=data_mod, method='REML' )
-  beta_hm = fixed.effects(model_hm)
-  eta_hm = random.effects(model_hm)
+  beta_hm = nlme::fixed.effects(model_hm)
+  eta_hm = nlme::random.effects(model_hm)
 
-  theta_mcmc_ini[paste("beta_hm_",1:4,sep="")] <- fixed.effects(model_hm)
-  theta_mcmc_ini["sigma_hm_eta"] <- intervals(model_hm)$reStruct$Site[[2]]
-  theta_mcmc_ini["sigma_hm"] <- intervals(model_hm)$sigma[2]
-  theta_mcmc_ini["v"]<-(intervals(model_hm)$varStruct[2])^2
+  theta_mcmc_ini[paste("beta_hm_",1:4,sep="")] <- nlme::fixed.effects(model_hm)
+  theta_mcmc_ini["sigma_hm_eta"] <- nlme::intervals(model_hm)$reStruct$Site[[2]]
+  theta_mcmc_ini["sigma_hm"] <- nlme::intervals(model_hm)$sigma[2]
+  theta_mcmc_ini["v"]<-(nlme::intervals(model_hm)$varStruct[2])^2
   theta_mcmc_ini[paste("eta_hm_",rownames(eta_hm),sep="")] <- eta_hm[,1]
   theta_mcmc_ini[paste("eta_hm_",unique(data_arc$Site),sep="")] <- 0
 
@@ -316,7 +327,7 @@ mcmc_agric_model <- function( data_arc,
     model_po <- ordinal::clmm( ManureLevel ~ 1 + Size + (1|Site) , data=data_arc_imp )
     theta_mcmc_ini[c("alpha_po_1","alpha_po_2")] <- model_po$alpha
     theta_mcmc_ini["gamma_po_1"] <- model_po$beta
-    eta_po <- random.effects(model_po)$Site
+    eta_po <- nlme::random.effects(model_po)$Site
     theta_mcmc_ini["sigma_eta_PO"] <- unlist(model_po$ST,use.names=FALSE)
     theta_mcmc_ini[paste("eta_po_",rownames(eta_po),sep="")] <- eta_po[,1]
 
@@ -461,7 +472,7 @@ mcmc_agric_model <- function( data_arc,
             if( is.element( theta_names[par_i] , colnames(accept_rate_adapt) ) ) {
               data_accept_rate = data.frame( y = accept_rate_adapt[1:adapt_i,theta_names[par_i]],
                                              x = theta_prop_int_adapt[1:adapt_i,theta_names[par_i]] )
-              aux <- lm( y~x, data_accept_rate)$coeff
+              aux <- stats::lm( y~x, data_accept_rate)$coeff
 
               # There should be a negative relation between the length of the proposal interval and the acceptance rate
               if( (aux[2]<0)&!is.na(aux[2]) ) {
@@ -539,13 +550,13 @@ mcmc_agric_model <- function( data_arc,
     mcmc_res[["Rainfall_imp_mcmc"]] <- coda::mcmc( mcmc_res[["Rainfall_imp_mcmc"]] )
   }
   # Saving results (preliminary) #
-  saveRDS( mcmc_res, file=out_file_rds )
+  save( mcmc_res, file=out_file_rda )
 
   if( is.element(impute_spec,c("smi","cut")) ) {
 
     # Model matrices
     X = matrix(data_arc$Size,ncol=1)
-    X_eta = model.matrix(~-1+Site,data=data.frame(Site=as.factor(data_arc$Site)))
+    X_eta = stats::model.matrix(~-1+Site,data=data.frame(Site=as.factor(data_arc$Site)))
 
     comb <- function(...) {
       mapply('rbind', ..., SIMPLIFY=FALSE)
@@ -614,12 +625,12 @@ mcmc_agric_model <- function( data_arc,
     mcmc_res$predict_summary = foreach::foreach(i=1:3,.combine = rbind) %do%{
       loo_summary <- mcmc_res$loo[[i]]$estimates %>% as.data.frame() %>%
         tibble::rownames_to_column("param") %>%
-        tidyr::pivot_longer(-param,names_to='statistic',values_to="value") %>%
-        dplyr::mutate(param=paste(param,names(mcmc_res$loo)[i],sep="_"))
+        tidyr::pivot_longer(-.data$param,names_to='statistic',values_to="value") %>%
+        dplyr::mutate(param=paste(.data$param,names(mcmc_res$loo)[i],sep="_"))
       waic_summary <- mcmc_res$waic[[i]]$estimates %>% as.data.frame() %>%
         tibble::rownames_to_column("param") %>%
-        tidyr::pivot_longer(-param,names_to='statistic',values_to="value") %>%
-        dplyr::mutate(param=paste(param,names(mcmc_res$waic)[i],sep="_"))
+        tidyr::pivot_longer(-.data$param,names_to='statistic',values_to="value") %>%
+        dplyr::mutate(param=paste(.data$param,names(mcmc_res$waic)[i],sep="_"))
       rbind(loo_summary,waic_summary) %>%
         as.data.frame()
     }
@@ -645,9 +656,9 @@ mcmc_agric_model <- function( data_arc,
         file=log_file, append=TRUE)
   }
 
-  if( !is.null(out_file_rds) ) {
+  if( !is.null(out_file_rda) ) {
     # Saving the results #
-    saveRDS( mcmc_res, file=out_file_rds )
+    save( mcmc_res, file=out_file_rda )
   }
 
   return(mcmc_res)

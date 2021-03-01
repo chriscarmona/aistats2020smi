@@ -1,6 +1,7 @@
 ^aistats2020smi\.Rproj$
+^.*\.Rproj$
 ^\.Rproj\.user$
+^README\.Rmd$
 ^LICENSE\.md$
-^doc$
-^Meta$
-.travis.yml
+^renv$
+^renv\.lock$

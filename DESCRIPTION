@@ -1,62 +1,49 @@
 Package: aistats2020smi
 Type: Package
 Title: Semi-Modular Inference
-Version: 0.1.1
-Date: 2020-02-29
+Description: Code for the AISTATS 2020 article: Semi-Modular Inference by Carmona & Nicholls (2020).
+Version: 0.2.0
+Date: 2021-02-23
 Authors@R: 
     person(given = "Christian",
            family = "Carmona",
-           role = c("aut", "cre"),
+           role = c("aut", "cre", "cph"),
            email = "carmona@stats.ox.ac.uk",
            comment = c(ORCID = "0000-0003-0224-4968"))
-Description: Code for the AISTATS 2020 article: Semi-Modular Inference by Carmona & Nicholls (2020).
-License: Apache License (>= 2.0)
+URL: https://github.com/christianu7/aistats2020smi/
+BugReports: https://github.com/christianu7/aistats2020smi/issues
+License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: TRUE
-Biarch: TRUE
-Depends: 
+LazyData: true
+Depends:
     R (>= 3.5.0)
+LinkingTo: 
+    Rcpp,
+    RcppArmadillo
 Imports: 
+    abind,
     coda,
+    cowplot,
     doRNG,
     dplyr,
     foreach,
-    ggplot2,
-    ggthemes,
-    loo,
-    magrittr,
-    methods,
-    nlme,
-    ordinal,
-    Rcpp (>= 0.12.0),
-    RcppArmadillo,
-    reshape,
-    rstan (>= 2.18.1),
-    rstantools (>= 2.0.0),
-    tibble,
-    tidyr
-LinkingTo: 
-    BH (>= 1.66.0),
-    Rcpp,
-    RcppArmadillo,
-    RcppEigen (>= 0.3.3.3.0),
-    rstan (>= 2.18.1),
-    StanHeaders (>= 2.18.0)
-Suggests:
-    abind,
-    cowplot,
-    doParallel,
-    GPfit,
     ggcorrplot,
     ggmcmc,
+    ggplot2,
     ggridges,
-    grDevices,
-    mvtnorm,
+    GPfit,
+    loo,
+    magrittr,
+    nlme,
+    ordinal,
+    Rcpp,
+    RcppArmadillo,
+    rlang,
+    rstan,
     stringr,
-    utils
-SystemRequirements:
-    GNU make
-VignetteBuilder:
-    utils
+    tibble,
+    tidyr
+Roxygen:
+    list(markdown = TRUE)
 RoxygenNote:
-    7.0.2
+    7.1.1

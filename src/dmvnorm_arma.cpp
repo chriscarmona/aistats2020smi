@@ -5,6 +5,12 @@
 
 const double log2pi = std::log(2.0 * M_PI);
 
+//' @title Multivariate Normal Density Function
+//' @description This function returns the log-density for a multivariate Gaussian distribution. Originally from: https://gallery.rcpp.org/articles/dmvnorm_arma/
+//' @param x matrix of observations
+//' @param mean mean vector
+//' @param sigma positive definite covariance matrix
+//' @param logd logical; whether log-density should be returned (default to FALSE)
 //' @export
 // [[Rcpp::export]]
 arma::vec dmvnorm_arma( arma::mat x,

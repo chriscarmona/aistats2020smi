@@ -1,6 +1,7 @@
-# Default colors in ggplot
+#' @title Set default ggplot2 theme
+#' @title Configures ggplot2 theme to be used in our plots
+#' @param resize Resize some of the text elements
 #' @import ggplot2
-#' @import ggthemes
 #' @export
 set_ggtheme <- function( resize=FALSE ){
   theme_set( theme_bw() )
@@ -61,7 +62,7 @@ mapto01 <- function(x,na.rm=T){
   (x-min(x,na.rm=na.rm))/diff(range(x,na.rm=na.rm))
 }
 
-#' @import grid
+#' @importFrom grid grid.newpage pushViewport viewport grid.layout
 multiplot <- function(..., plotlist=NULL, cols) {
 
   # Make a list from the ... arguments and plotlist

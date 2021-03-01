@@ -17,6 +17,7 @@
 #'
 #' @param arc_datasets indicated the datasets used for sampling the archaeological covariates.
 #' @param vars_log indicated the variables to be rescale to have mean \code{0} and variance \code{1}.
+#' @param vars_sqrt indicated the variables that are transformed with square root.
 #' @param vars_scale_int_0_1 indicated the variables to be rescale to the interval \code{[0,1]}.
 #' @param vars_scale_mean_0_var_1 indicated the variables to be rescale to have mean \code{0} and variance \code{1}.
 #'
@@ -48,7 +49,7 @@
 #' p
 #'
 #' @import ggplot2
-#' @import stats
+#' @importFrom stats sd
 #'
 #' @export
 #'
@@ -107,7 +108,7 @@ get_agricurb_data <- function( arc_datasets="NMeso",
     }
     Agricurb_data[,vars_sqrt] <- sqrt(Agricurb_data[,vars_sqrt])
   }
-  
+
   # Rescale the variables listed in "vars_scale_int_0_1" to the interval [0,1]
   # vars_scale_int_0_1 = c("Size","Rainfall")
   if( !is.null(vars_scale_int_0_1) ) {

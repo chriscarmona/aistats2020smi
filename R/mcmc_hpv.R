@@ -2,116 +2,43 @@
 #'     MCMC procedure for ecological study of HPV and cervical cancer
 #'
 #' @description
-#'     This function perform MCMC sampling for the ecological study of HPV and cervical cancer.
-#'     There are two modules in this model: Poisson and Binomial.
+#'    MCMC sampling for the ecological study of HPV and cervical cancer.
 #'
 #' @param HPV Data frame. Data for correlation between human papillomavirus (HPV) prevalence and cervical cancer incidence.
-#'
-#' @param impute_spec Character. Specification of imputed values of ManureLevel: "full", "cut", "smi"
-#'
-#' @param power_w_PO Numeric. Raise the likelihood in the PO module to a power when performing M-H steps.
-#' @param power_w_HM Numeric. Raise the likelihood in the HM module to a power when performing M-H steps.
-#'
-#' @param prior_spec_PO specification of prior distributions for the parameters in the PO model: "flat" or "proper"
-#' @param prior_spec_HM specification of prior distributions for the parameters in the HM model: "flat" or "proper"
-#'
-#' @param PO_site_rnd_eff Boolean. Shall the PO module use random effects by Site
-#' @param HM_site_rnd_eff Boolean. Shall the HM module use random effects by Site
-#'
+#' @param hpv_model_whole_stan stanmodel. The compiled stan model with the powered version of the HPV model.
+#' @param hpv_model_poisson_stan stanmodel. The compiled stan model with the poisson module of the HPV model.
+#' @param eta_pois Float. Degree of influence of the poisson module.
+#' @param eta_binom Float. Degree of influence of the poisson module.
 #' @param n_iter Integer. Number of iterations in the main MCMC chain.
-#' @param n_iter_sub Integer. Number of updates in the subchain for parameters in the PO module.
+#' @param n_warmup Integer. Number of updates discarded when "warming-up" the MCMC.
+#' @param n_chains_mcmc Integer. Number of parallel chains produced by the sampler
+#' @param n_iter_sub Integer. Number of updates in the subchain of the two-stage MCMC
+#' @param out_file_rda Indicates a file (.rda) where the output should be saved
+#' @param n_cores Number of cores used by stan in the sampling process.
 #'
-#' @param theta_ini Numeric vector. Initial values for the parameters
-#' @param theta_min_max matrix with two columns, minimum and maximum values for each parameter
-#' @param theta_prop_int Used to control the width of the proposal distribution for parameters in PO and HM modules
-#' @param theta_prop_kernel Shape of the proposal distribution: "uniform" or "normal"
-#'
-#' @param n_epoch_adapt Integer. Number of epochs that adaptation runs of the MCMC, to addapt the proposal distribution, is performed before the real chain.
-#' @param n_iter_adapt Integer. Number of iterations in the adaptation runs of the MCMC.
-#'
-#' @param ManureLevel_arc_imp_ini Initial values for imputing the missing values of Rainfall
-#' @param Rainfall_arc_imp_ini Initial values for imputing the missing values of Rainfall
-#'
-#' @param gibbs_hm Boolean. Shall we use Gibss to update parameters in the HM module. If FALSE, M_H is used.
-#'
-#' @param PO_expand Indicates if the Proportional Odds models should be expanded by considering an additional mixture component
-#' @param POmixda Indicates if the inference for the mixture model uses data augmentation
-#' @param lambda_prop_int Double. Width of the proposal distribution for the mixing weight, when PO_expand=TRUE
-#' @param lambda_mix_PO_prior Numeric vector. indicates the two parameters of the beta prior for the mixture weight
-#'
-#' @param keep_imp Indicates if the imputed values for missing data should be returned
-#'
-#' @param out_file_rds Indicates a file (.rds) where the output should be saved
-#' @param log_file Indicates a file (.txt) where the log of the process should be saved
-#' @param devel Development mode
-#'
-#'
-#' @details
-#' The hierarchical model consists of two parts: The Proportional Odds (PO1) component, and the Gaussian Linear model (HM1).
-#'   HM1:
-#'      normd15N ∼ 1 + Rainfall + ManureLevel + (1|Site)
-#'      weights = varIdent(form=~1|Category)
-#'   PO1:
-#'      ManureLevel ∼ 1 + Size + (1|Site)
-#'      link = "logistic"
-#'
-#' MCMC details:
-#'     Coefficients in the HM1 modulel can be updated using Gibbs sampling (gibbs_hm=TRUE) for the joint conditional posterior, M-H otherwise
-#'     Parameters in the PO module are updated using M-H, updating one by one.
-#'     ManureLevel missing values is updated using M-H one value at a time.
-#'     Rainfall missing values are updated all together using M-H.
-#'
-#'     This function allows to perform adaptations for the proposal of the PO1 parameters. Change n_epoch_adapt and n_iter_adapt.
-#'
-#'     In this implementation, we allow to perform several types of inference.
-#'     1) Conventional Bayes (default): impute_spec="full", set power_w_HM=1, power_w_PO=1
-#'     2) Powered likelihood: impute_spec="full", gibbs_hm="FALSE", set "power_w_HM" and "power_w_PO" to control the influence of each module in the update of parameters and missing data.
-#'     3) Cut model: impute_spec="cut" (deprecate set power_w_HM and power_w_PO). Bayesian multiple imputation for ManureLevel.
-#'     4) smi imputation: impute_spec="smi", set "power_w_HM" and "power_w_PO" to control the influence of each module in the imputation of ManureLevel.
-#'
-#'     Parameters are initialized in the MLE using a single imputation of missing values.
-#'
-#' @return
-#'
-#' A list with three main elements, described below, and some details about the run.
-#' \describe{
-#'     \item{\code{theta_mcmc}}{Matrix with the chains of the parameters in the model.}
-#'     \item{\code{ManureLevel_imp_mcmc}}{if keep_imp=TRUE, matrix with the chains of the imputed values of the missing ManureLevel.}
-#'     \item{\code{Rainfall_imp_mcmc}}{if keep_imp=TRUE, matrix with the chains of the imputed values of the missing Rainfall.}
-#' }
-#'
-#'
-#' @examples
-#'
-#' \dontrun{
-#'
-#' ##### Cut model for NMeso data #####
-#'
-#' }
-#'
-#' @import nlme
-#' @import ordinal
-#' @import doRNG
+#' @importFrom doRNG %dorng%
+#' @importFrom foreach foreach
+#' @importFrom rstan sampling extract
 #'
 #' @export
-#'
-
 mcmc_hpv <- function( HPV, # HPV data
+
+                      hpv_model_whole_stan,
+                      hpv_model_poisson_stan,
 
                       # SMI degree of influence for each module
                       eta_pois = 1,
                       eta_binom = 1,
 
                       # Number of iterations
-                      n_iter_mcmc = 10000, # main chain
-                      n_iter_warmup = 1000,
+                      n_iter = 10000, # main chain
+                      n_warmup = 1000,
                       n_chains_mcmc = 4, # Number of chains
-                      n_iter_mcmc_stage_2 = 200, # Subchain
+                      n_iter_sub = 200, # Subchain
 
-                      # Other
-                      mcmc_file=NULL,
-                      n_cores ) {
-  # browser()
+                      out_file_rda=NULL,
+                      n_cores=1 ) {
+
   # Data in stan format #
   HPV_data_stan <- list( n_obs=nrow(HPV),
                          nhpv = HPV$nhpv,
@@ -123,10 +50,10 @@ mcmc_hpv <- function( HPV, # HPV data
                          phi=NULL )
 
   ### Power likelihood ###
-  stan_fit <- rstan::sampling( stanmodels$hpv_model_full_pow,
+  stan_fit <- rstan::sampling( hpv_model_whole_stan,
                                data = HPV_data_stan,
-                               iter = n_iter_mcmc,
-                               warmup = n_iter_warmup,
+                               iter = n_iter,
+                               warmup = n_warmup,
                                chains = n_chains_mcmc,
                                cores = n_cores,
                                # pars=c("phi","theta1","theta2"),
@@ -147,9 +74,9 @@ mcmc_hpv <- function( HPV, # HPV data
                               HPV_data_stan$phi = hpv_mcmc_pow$phi[imp_i, ]
 
                               # Sample the poisson module conditional on such imputed phi
-                              stan_fit <- rstan::sampling( stanmodels$hpv_model_pois_module,
+                              stan_fit <- rstan::sampling( hpv_model_poisson_stan,
                                                            data = HPV_data_stan,
-                                                           iter = n_iter_mcmc_stage_2,
+                                                           iter = n_iter_sub,
                                                            chains = 1,
                                                            pars=c("theta1","theta2"),
                                                            show_messages=FALSE )
@@ -170,8 +97,8 @@ mcmc_hpv <- function( HPV, # HPV data
   rownames(hpv_mcmc_smi) = NULL
 
   # Save results #
-  if( !is.null(mcmc_file) ){
-    saveRDS( hpv_mcmc_smi, file=mcmc_file )
+  if( !is.null(out_file_rda) ){
+    save( hpv_mcmc_smi, file=out_file_rda )
   }
 
   return( hpv_mcmc_smi )

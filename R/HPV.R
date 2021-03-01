@@ -12,9 +12,6 @@
 #'     The data came from a series of surveys in 13 different countries. Incidence data come from cancer registries in the same populations. We consider the oldest age group (55–64 years) in the survey, which demonstrated the strongest correlation between HPV and cervical cancer.
 #'     In population i, the outcome ncases[i] is the number of cancer cases arising from Npop[i] woman-years of follow-up; nhpv[i] is the number of women infected with high-risk HPV in a sample of size Npart[i] from the same population.
 #'
-#' @usage
-#'     HPV
-#'
 #' @format
 #'     A data frame with 13 rows and 4 variables.
 #'     \describe{

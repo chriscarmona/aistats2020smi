@@ -7,21 +7,11 @@
 #'
 #' @aliases aistats2020smi
 #'
-#' @useDynLib aistats2020smi, .registration = TRUE
-#'
-#' @import coda
-#' @import ggplot2
-#' @import ggthemes
-#' @import methods
-#' @import nlme
-#' @import ordinal
-#' @import Rcpp
-#' @import RcppArmadillo
-#' @import reshape
-#'
-#' @importFrom rstan sampling
-#'
 #' @references
 #' Chris U. Carmona, Geoff K. Nicholls (2020). Semi-Modular Inference: enhanced learning in multi-modular models by tempering the influence of components
 #'
+## usethis namespace: start
+#' @useDynLib aistats2020smi, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
+## usethis namespace: end
 NULL
