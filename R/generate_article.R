@@ -18,7 +18,7 @@
 #'
 #' @export
 
-generate_article <- function( out_dir,
+generate_article <- function( out_dir = getwd(),
                               compute_mcmc = FALSE,
                               mcmc_dir = NULL,
                               compile_path = NULL,
@@ -36,11 +36,11 @@ generate_article <- function( out_dir,
     compile_path = tempdir()
   }
 
-  # Remove trailing slash from directories
-  out_dir = normalizePath( out_dir )
-  mcmc_dir = normalizePath( mcmc_dir )
-  pkg_dir = normalizePath( pkg_dir )
-  compile_path = normalizePath( compile_path )
+  # Normalizing paths, using forward slash is important for latex
+  out_dir = normalizePath( out_dir, winslash='/')
+  mcmc_dir = normalizePath( mcmc_dir, winslash='/')
+  pkg_dir = normalizePath( pkg_dir, winslash='/')
+  compile_path = normalizePath( compile_path, winslash='/')
 
   if( !file.exists(out_dir) ) {
     stop(paste(out_dir,'not found'))
@@ -77,7 +77,7 @@ generate_article <- function( out_dir,
   # Return to original directory
   setwd(cwd)
 
-  cat('Article and supplement generated succesfully\n',pdf_path,'\n')
+  cat('Article and supplement generated succesfully!\n',pdf_path,'\n')
 
   return(TRUE)
 

@@ -6,7 +6,7 @@
 }}
 \usage{
 generate_article(
-  out_dir,
+  out_dir = ".",
   compute_mcmc = FALSE,
   mcmc_dir = NULL,
   compile_path = NULL,

@@ -15,15 +15,15 @@
 #'
 #' @export
 
-download_mcmc_results <- function( mcmc_dir,
+download_mcmc_results <- function( mcmc_dir="./smi_mcmc",
                                    url = "https://chriscarmona.me/files/aistats2020smi_mcmc_results.zip"
   ) {
 
   mcmc_dir = normalizePath(mcmc_dir)
   cat("Downloading MCMC files to:\n",mcmc_dir,"\n")
-  temp <- tempfile()
+  temp <- tempfile(fileext = ".zip")
   utils::download.file( url=url, destfile=temp )
   utils::unzip(temp, exdir=mcmc_dir, junkpaths=TRUE )
-
+  cat("MCMC files downloaded at:\n",mcmc_dir,"\n")
   return(TRUE)
 }

@@ -6,7 +6,7 @@
 }}
 \usage{
 download_mcmc_results(
-  mcmc_dir,
+  mcmc_dir = "./smi_mcmc",
   url = "https://chriscarmona.me/files/aistats2020smi_mcmc_results.zip"
 )
 }

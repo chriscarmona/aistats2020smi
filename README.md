@@ -58,17 +58,18 @@ devtools::install_github("christianu7/aistats2020smi")
 
 The main article and supplementary material can be reproduced entirely
 using a `.Rnw` file included in this repo. Executing the following
-command will generate a pdf file in your `Documents` folder:
+command will generate a pdf file in your current directory:
 
 ``` r
-aistats2020smi::generate_article( out_dir="~/Documents" )
+print( getwd() )
+aistats2020smi::generate_article( out_dir="." )
 ```
 
 If you prefer to keep and analyse intermediate outputs, consider
 executing the following commands:
 
 ``` r
-dir.create("~/smi_article")
-aistats2020smi::download_mcmc_results( dest_path = "~/smi_article" )
-aistats2020smi::generate_article( out_dir="~/smi_article", mcmc_dir="~/smi_article" )
+dir.create("./smi_article")
+aistats2020smi::download_mcmc_results( mcmc_dir = "./smi_article" )
+aistats2020smi::generate_article( out_dir=".", mcmc_dir="./smi_article" )
 ```
