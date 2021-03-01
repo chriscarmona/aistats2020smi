@@ -8,6 +8,7 @@
 [![License:
 MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://cran.r-project.org/web/licenses/MIT)
 [![devel-version](https://img.shields.io/badge/devel%20version-0.2.0-blue.svg)](https://github.com/christianu7/aistats2020smi)
+[![arXiv](https://img.shields.io/badge/arXiv-2003.06804-b31b1b.svg)](https://arxiv.org/abs/2003.06804)
 <!-- badges: end -->
 
 This repo contains code for our AISTATS article on **Semi-Modular
@@ -19,7 +20,8 @@ information between modules.
 
 For an introduction to SMI, we invite you to watch our [slideslive
 presentation](https://slideslive.com/38930337) (best on 1.5x),
-[<img src="inst/figures/cover.png" width="70%" style="display: block; margin: auto;" />](https://slideslive.com/38930337)
+
+[<img src="inst/figures/slideslive_smi.png" width="70%" style="display: block; margin: auto;" />](https://slideslive.com/38930337)
 
 ## Citation
 
@@ -62,14 +64,22 @@ command will generate a pdf file in your current directory:
 
 ``` r
 print( getwd() )
-aistats2020smi::generate_article( out_dir="." )
+aistats2020smi::generate_article( out_dir=getwd() )
 ```
 
 If you prefer to keep and analyse intermediate outputs, consider
 executing the following commands:
 
 ``` r
-dir.create("./smi_article")
-aistats2020smi::download_mcmc_results( mcmc_dir = "./smi_article" )
-aistats2020smi::generate_article( out_dir=".", mcmc_dir="./smi_article" )
+path = "~/smi_article"
+dir.create(path)
+aistats2020smi::download_mcmc_results( mcmc_dir = path )
+aistats2020smi::generate_article( out_dir = path, mcmc_dir = path )
 ```
+
+## Coming soon, Variational SMI
+
+You may also be interested in our current work on Scalable Semi-Modular
+Inference via Normalizing flows. Here is a teaser of our current work
+
+[<img src="inst/figures/youtube_vsmi.png" width="60%" style="display: block; margin: auto;" />](https://www.youtube.com/watch?v=EmpoUiLqk2o)
