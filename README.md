@@ -50,7 +50,8 @@ You can install the devel version of aistats2020smi from our github
 repository
 
 ``` r
-install_github("christianu7/aistats2020smi")
+#install.packages("devtools")
+devtools::install_github("christianu7/aistats2020smi")
 ```
 
 ## Reproducibility
